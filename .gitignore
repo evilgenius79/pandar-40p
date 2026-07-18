@@ -1,0 +1,12 @@
+# bags & data never go in git
+*.bag
+*.db3
+*.mcap
+*.pcap
+*.pcd
+*.ply
+mapping_bags/
+# builds
+firmware/imu_bridge/.pio/
+__pycache__/
+*.pyc
