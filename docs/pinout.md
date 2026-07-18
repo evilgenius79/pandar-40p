@@ -9,8 +9,8 @@ Verified against the official manual §2.2.1 AND by continuity on unit #1's stub
 | 1–4 | not used | — |
 | 5 | Ethernet RX− | Blue |
 | 6 | Ethernet RX+ | Blue/White |
-| 7 | Ethernet TX− | Orange |
-| 8 | Ethernet TX+ | Orange/White |
+| 7 | Ethernet TX− | Orange | Automotive Ethernet
+| 8 | Ethernet TX+ | Orange/White | Automotive Ethernet
 | 9 | GPS NMEA (**RS232 level, ±13 V — never TTL**) | White |
 | 10 | GPS PPS (≥1 ms pulse) | Yellow |
 | 11 | Power V+ | Red |
