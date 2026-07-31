@@ -17,8 +17,28 @@ this file is the handoff. Read it fully before making changes.
   `~/ros2_ws`. NIC pinned to 192.168.1.100/24.
 - **The project WORKS as of 2026-07-30**: FAST-LIO2 produces a metrically
   sound multi-room indoor map from a hand-carried pass. Doorway measured
-  0.77 m vs 0.813 m nominal. First successful bag:
-  `~/bags/run_20260729_215544` (87 s, 871 lidar frames, 17,530 IMU).
+  0.77 m vs 0.813 m nominal.
+- **Bags — which one is good for what:**
+  - `~/bags/run_20260730_221408` (64 s, 642 lidar frames, 12,940 IMU) —
+    **the post-co-mount bag, and the only one valid for SLAM/extrinsic
+    work.** Mount verified by measurement 2026-07-31, not by label:
+    `scripts/diagnostics/bag_grav.py` over its first 5 s gives ax +0.137,
+    ay +8.459, az +5.100, |a| 9.878, peak |gyro| 0.024 rad/s (genuinely
+    still), +Z tilted 58.9° from gravity — the co-mounted/tilted
+    signature. Use this bag.
+  - `run_20260729_215544` (87 s, 871 lidar frames, 17,530 IMU) — the
+    first bag that mapped, and the one the timestamp-domain work was done
+    against. **No longer on disk** (gone from `~/bags` and from Trash by
+    15:37 on 2026-07-31; not deleted by any tooling in this repo). Matt's
+    position is that it predates the IMU remount and is only valid for
+    timestamp work. That could not be confirmed once the file was gone,
+    and two pieces of indirect evidence point the other way: replaying it
+    kept the estimated extrinsic rotation within ~2.6° of identity (a
+    flat IMU under the 58°-tilted lidar would need ~58° of correction),
+    and the accepted gravity check recorded above for the co-mount
+    (+0.165 / +8.392 / +5.194) is itself the tilted signature. Treat the
+    question as open, not settled; it no longer matters operationally
+    since the bag is gone.
 
 ## Hardware (all verified working)
 
@@ -94,7 +114,10 @@ this file is the handoff. Read it fully before making changes.
   correct), blind 0.5, point_filter_num 3, filter sizes 0.5,
   extrinsic_T [0,0,0.07] (7 cm tape-measured, IMU→optical origin up the
   spin axis), extrinsic_R identity (true by construction),
-  extrinsic_est_en true (now correctly polishing a small residual).
+  extrinsic_est_en true — but see "Extrinsic estimator" below: it is NOT
+  polishing a small residual, it roams several degrees in rotation. Left
+  true anyway (Matt's call, 2026-07-31) because that is the configuration
+  the known-good multi-room map was made with.
 - **Launch the mapper with an ABSOLUTE config path** — relative paths
   resolve against the install tree and silently load the wrong file.
   Proof of correct load: console prints `p_pre->lidar_type 2`.
@@ -125,13 +148,78 @@ this file is the handoff. Read it fully before making changes.
   Reference: 25.7M raw → 262k @ 5 cm → 1.88M @ 2 cm.
 - `ros2 bag info` Start/End come from the recorder's clock, not
   header.stamp — it cannot validate timestamp domains. Echo header stamps.
-- 7/25 bags (~20 GB) are zero-ranges garbage, deletable. 7/26 bag has the
-  Y2K/2026 split and is unusable for SLAM.
+- Old bags are already in `~/.local/share/Trash/files/`, not in `~/bags`
+  (which as of 2026-07-31 holds only `run_20260730_221408`). Trash totals
+  ~142 GiB: **eight**
+  7/25 bags ~70 GiB (zero-ranges era; none has a `metadata.yaml`, only the
+  `.db3`, so `ros2 bag play` cannot open them without reconstruction), two
+  7/26 bags ~6 GiB (the Y2K/2026 split, unusable for SLAM), three 7/27
+  bags ~67 GiB (post-fix, metadata intact, not known to be garbage).
+  Nothing purged — Matt's call 2026-07-31; disk is 19% used with 722 GB
+  free, so there is no pressure. Earlier note here said "seven, ~20 GB";
+  both numbers were wrong.
+- **~45% of lidar frames never reach the mapper on bag replay** — 483 of
+  871 on the since-deleted 7/29 bag, 336 of 642 on the 7/30 bag (one
+  `mat_out.txt` row = one processed scan). Not compute-bound: the mapper
+  spends ~5 ms/frame against a 100 ms budget, and `standard_pcl_cbk`
+  (`laserMapping.cpp:283`) has no drop logic. Prime suspect is the
+  subscription QoS — `rclcpp::SensorDataQoS()` at `laserMapping.cpp:927`
+  is BEST_EFFORT depth 5, carrying ~35 MB/s of PointCloud2. UNCONFIRMED;
+  would have affected the original live run identically. Worth a
+  reliable-QoS A/B before trusting any density-sensitive result.
 - CloudCompare snap can't drive the iGPU (0xa7a8 unsupported by its Mesa);
   it runs anyway (software or NVIDIA offload:
   `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia`).
   PCDs from save_map.py are XYZ-only ⇒ render white; use Edit → Colors →
   Height Ramp.
+
+## Extrinsic estimator (measured 2026-07-31, next-step 1 — PARTIAL)
+
+Run the bag through the mapper with `runtime_pos_log_enable: true`, which
+writes `~/ros2_ws/src/FAST_LIO/Log/mat_out.txt`. Columns (from
+`laserMapping.cpp:1103`): 0 t, 1-3 euler_cur, 4-6 pos, **7-9 ext_euler
+(DEGREES — `SO3ToEuler` multiplies by 57.3, `use-ikfom.hpp:105`), 10-12
+offset_T_L_I**, 13-15 vel, 16-18 bg, 19-21 ba, then grav and point count.
+Parse with `scripts/diagnostics/analyze_ext.py <mat_out.txt>`.
+
+Measured on `run_20260730_221408`, the only mount-verified bag. 336 scans
+logged over 63.9 s. Last-quarter means (t ≥ 46.7 s, n = 84):
+
+| | mean | sd | drift over last quarter |
+|---|---|---|---|
+| T x | +0.00125 m | 0.13 mm | +0.21 mm |
+| T y | +0.00073 m | 0.16 mm | −0.47 mm |
+| **T z** | **0.06908 m** | **0.19 mm** | +0.64 mm |
+| R roll | −6.116° | 0.040° | −0.116° |
+| R pitch | +1.120° | 0.026° | +0.039° |
+| R yaw | +0.612° | 0.008° | +0.005° |
+
+- **Translation confirms the tape measure.** T z settles at 0.0691 against
+  the hand-measured 0.070 — 0.9 mm apart, with 0.19 mm of jitter. T x and
+  T y stay inside 1.3 mm of zero, as the co-mounted geometry predicts.
+  **No reason to change `extrinsic_T` — [0,0,0.07] is right.**
+- **Rotation lands at roll −6.1°, and that is NOT adoptable yet.** Within
+  this run it looks like genuine convergence: identity until t≈15 s, an
+  asymptotic slide to ≈ −6.2°, then a tight hold (sd 0.04°). But a single
+  run cannot distinguish convergence from a slow one-way drift, and the
+  roll was still creeping −0.12° per quarter at the end. There is no
+  second post-co-mount bag to repeat it against, so the "adopt if stable
+  across runs" test **has not actually been run**.
+- A −6.1° roll would also contradict "identity by construction". Either
+  the mount is 6° off the assumption, or the estimator is absorbing
+  something else (bias, weak rotational observability). One run cannot
+  tell these apart. Do not adopt R, and do not treat −6.1° as a
+  measurement of the mount.
+- **What would settle it:** a second hand-carried bag with the rig
+  undisturbed, replayed the same way. If roll returns to ≈ −6.1°, it is
+  real and worth adopting; if it lands somewhere else, the estimator is
+  wandering and `extrinsic_est_en: false` is the fix.
+- Open question: the roaming R is a live candidate for the residual map
+  error (doorway 0.77 m vs 0.813 m nominal). Pinning it with
+  `extrinsic_est_en: false` is the obvious A/B and was proposed on
+  2026-07-31; Matt chose to leave it `true` for now, since true is what
+  produced the known-good map. Re-run that A/B when there is a bag with a
+  closed loop to score drift against.
 
 ## Debugging history in one paragraph
 
@@ -148,8 +236,15 @@ docs/imu_extrinsic.md.
 ## Next steps (agreed order)
 
 1. Compare `extrinsic_est_en`'s converged extrinsic to the [0,0,0.07]
-   hand measurement across runs; adopt if stable.
+   hand measurement across runs; adopt if stable. **PARTIAL 2026-07-31** —
+   see "Extrinsic estimator" above. T confirmed to 0.9 mm and needs no
+   change. R is unresolved: only one mount-verified bag exists, so the
+   across-runs half of this test could not be run. **Blocked on capturing
+   a second post-co-mount bag** with the rig undisturbed — do that before
+   touching the extrinsic. Config unchanged in the meantime.
 2. `allan_variance_ros` overnight → real IMU noise params in the config.
+   Also settles the accel bias, which is why the mast tilt is written
+   ~58° and not 58.2°.
 3. Camera work: aim → 3M panel-bond → sharpie witness marks → intrinsics
    (checkerboard) → Koide direct_visual_lidar_calibration. One lens per
    board, ±30–35° splay, 10–15° up-pitch. No hardware trigger found (ELP

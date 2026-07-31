@@ -14,6 +14,8 @@ All assume the workspace is sourced. None require the mapper unless noted.
 | `scan_peek.py` | Point count and XYZ extents of 5 scans from `/cloud_registered` | Mapper running. Splits "registering garbage" from "registering nothing" in one look |
 | `save_map.py` | Accumulates `/cloud_registered`, voxel-downsamples, writes binary PCD on Ctrl+C | The map export path. FAST-LIO2's own `pcd_save_en` produced nothing on this rig |
 | `run_test.sh` | One-shot: config checks → SHM cleanup → mapper launch → bag replay → `scan_peek` | Regression test after config or source changes. Edit `BAG=` first. Do **not** rely on it for PCD export — its cleanup trap SIGTERMs the mapper |
+| `bag_grav.py` | Averages the first N seconds of a bag's `/imu/data_raw` accel into a gravity vector and names the mount signature | Identifying *which* bag is which. Reads the `.db3` with sqlite3 — no `ros2` CLI, no `metadata.yaml` needed. Use it before trusting a bag's label |
+| `analyze_ext.py` | Parses FAST-LIO2's `Log/mat_out.txt` and reports the estimated lidar↔IMU extrinsic over time plus last-quarter stability | After replaying a bag with `runtime_pos_log_enable: true`. See the "Extrinsic estimator" section of CLAUDE.md for the column layout and what the numbers mean |
 
 ## save_map.py usage
 
