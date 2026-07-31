@@ -1,0 +1,39 @@
+# FAST-LIO2 patches for Hesai Pandar40P (HesaiLidar_ROS_2.0 driver)
+#
+# Apply against the ROS2 branch of https://github.com/hku-mars/FAST_LIO
+# Line numbers are approximate to the state at 2026-07-30; if `patch`
+# rejects hunks, apply by hand — each change is small and the context
+# lines identify the location unambiguously.
+#
+#   cd ~/ros2_ws/src/FAST_LIO
+#   patch -p1 < fastlio_pandar40p.patch
+#   cd ~/ros2_ws && colcon build --packages-select fast_lio
+
+--- a/src/preprocess.h
++++ b/src/preprocess.h
+@@ Point type used by the velodyne-style handler @@
+-  float time;
++  double time;
+
+@@ PCL point registration macro: type AND source field name change @@
+-  (float, time, time)
++  (double, time, timestamp)
+
+--- a/src/preprocess.cpp
++++ b/src/preprocess.cpp
+@@ void Preprocess::velodyne_handler(...) — after the empty-cloud guard @@
+   if (plsize == 0)
+     return;
++
++  /*** Hesai driver emits ABSOLUTE epoch seconds per point; FAST-LIO expects
++       offsets from scan start. Normalize in place. No-op if already relative. ***/
++  if (pl_orig.points[0].time > 1e8)
++  {
++    const double ts_base = pl_orig.points[0].time;
++    for (int i = 0; i < plsize; i++)
++    {
++      pl_orig.points[i].time -= ts_base;
++    }
++  }
++
+   pl_surf.reserve(plsize);
