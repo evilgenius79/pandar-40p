@@ -49,3 +49,10 @@ blank:
 Any 2017+ vehicle with surround cameras/ADAS is full of T1 links. With a T1
 converter on the bench, salvage cameras and ECUs become testable. MATEnet/H-MTD
 pigtails can be harvested from late-model camera harnesses.
+
+## CONFIRMED WORKING (2026-07-26)
+BUELEC 100/1000Base-T1-TX-E: rate=**100M**, mode=**MASTER**, lidar **orange
+pair (Lemo 7/8)** in terminal block → RJ45 → laptop 192.168.1.100/24.
+Sensor reports model **PA40-Zoox**, fw 2.20.17, at factory IP 192.168.1.201.
+Full quirk list (zero-ranges trap, FOV page warning): see
+[zoox_quirks.md](zoox_quirks.md) — **read it before changing any setting.**

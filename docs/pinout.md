@@ -9,8 +9,8 @@ Verified against the official manual §2.2.1 AND by continuity on unit #1's stub
 | 1–4 | not used | — |
 | 5 | Ethernet RX− | Blue |
 | 6 | Ethernet RX+ | Blue/White |
-| 7 | Automotive Ethernet TX− | Orange | Automotive Ethernet
-| 8 | Automotive Ethernet TX+ | Orange/White | Automotive Ethernet
+| 7 | Automotive Ethernet TX− | Orange |
+| 8 | Automotive Ethernet TX+ | Orange/White |
 | 9 | GPS NMEA (**RS232 level, ±13 V — never TTL**) | White |
 | 10 | GPS PPS (≥1 ms pulse) | Yellow |
 | 11 | Power V+ | Red |
@@ -28,9 +28,9 @@ No power switch: the sensor spins the moment power + link are present.
 On the fleet variant the "Ethernet" pairs terminate at a **Broadcom BCM89811
 100BASE-T1 PHY** — only ONE pair carries data (single-pair automotive Ethernet).
 
-**TODO (carcass homework):** beep Lemo 5/6 (blue pair) and 7/8 (orange pair) to the
-BCM89811 region on the base board of unit #1; record which pair is the live T1 pair
-here: `T1 pair = ______`. That pair goes to the media converter's terminal block.
+**CONFIRMED (2026-07-26): T1 pair = ORANGE + ORANGE/WHITE (Lemo pins 7/8).**
+Blue pair (5/6) is unused on T1 fleet variants. Orange pair goes to the media
+converter's terminal block; link negotiates with converter set to MASTER, 100M.
 T1 polarity (P/N) matters on some PHYs — if no link: (1) swap the two wires,
 (2) toggle the converter's master/slave switch. Those two flips fix nearly all
 first-connection failures.

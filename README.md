@@ -43,7 +43,7 @@ dense colorized point clouds, meshes, and Gaussian splats.
 
 | Path | What |
 |---|---|
-| `docs/` | Build guide, bench checklist, pinout, T1 notes, teardown notes |
+| `docs/` | Build guide, bench checklist, pinout, T1 notes, **zoox_quirks.md (critical)**, teardown |
 | `hardware/` | BOM + wiring references |
 | `scripts/network/` | NIC setup, PTP master, lidar discovery |
 | `scripts/capture/` | rosbag2 recording helpers |
@@ -55,12 +55,16 @@ dense colorized point clouds, meshes, and Gaussian splats.
 ## Status
 
 - [x] Lidar #1: teardown (T1 PHY identified — BCM89811); parts donor
-- [ ] Lidar #2: bench test (see checklist)
-- [ ] T1 media converter: BUELEC 100/1000Base-T1-TX-E — ordered
-- [ ] IMU bridge bring-up (MPU6050 stand-in → ICM-42688-P)
-- [ ] Camera color confirmation + calibration
+- [x] Lidar #2: bench-verified — ranging, rings in RViz (after factory reset;
+      see docs/zoox_quirks.md — READ BEFORE CHANGING SETTINGS)
+- [x] T1 media converter: BUELEC — working (100M, Master, orange pair)
+- [x] IMU bridge: ICM-42688-P + XIAO v2 firmware — ~186 Hz verified, physics checked
+- [x] One-command startup: launch/rig.launch.py (driver + bridge + optional record)
+- [ ] First recorded bag (indoor room + carried lap)
+- [ ] FAST-LIO2 config evening → first SLAM map
+- [ ] Camera color confirmation + focus lock + calibration (after mount bonding)
 - [ ] Mast + stroller build
-- [ ] First indoor SLAM run
+- [ ] First walking capture
 
 ## Docs index
 
@@ -68,4 +72,5 @@ dense colorized point clouds, meshes, and Gaussian splats.
 - [Bench test checklist](docs/bench_test_checklist.md)
 - [Cable pinout + Ethernet wiring](docs/pinout.md)
 - [Automotive Ethernet / T1 notes](docs/t1_ethernet.md)
+- [**Zoox fleet quirks & the zero-ranges trap**](docs/zoox_quirks.md)
 - [Teardown notes (unit #1)](docs/teardown/README.md)
