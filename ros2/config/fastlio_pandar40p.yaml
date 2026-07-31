@@ -1,0 +1,46 @@
+/**:
+    ros__parameters:
+        feature_extract_enable: false
+        point_filter_num: 3            # use every 3rd point (plenty at 144k/frame)
+        max_iteration: 3
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0
+        runtime_pos_log_enable: false
+
+        common:
+            lid_topic: "/lidar_points"
+            imu_topic: "/imu/data_raw"
+            time_sync_en: false        # both stamped on ROS time; no offset hunt
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 2              # 2 = generic/Velodyne-style PointCloud2
+                                       # (Hesai's xyz+intensity+ring+timestamp
+                                       #  parses on this path)
+            scan_line: 40
+            timestamp_unit: 0          # 0 = seconds (Hesai driver: float64 s)
+            blind: 0.5                 # ignore returns <0.5 m (mount/self hits)
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            fov_degree: 360.0
+            det_range: 100.0
+            extrinsic_est_en: true     # let it refine our hand-measured extrinsic
+            extrinsic_T: [ 0.0, 0.0, 0.07 ]
+            extrinsic_R: [ 1.0, 0.0, 0.0,
+                           0.0, 1.0, 0.0,
+                           0.0, 0.0, 1.0 ]
+
+        publish:
+            path_en: true
+            scan_publish_en: true
+            dense_publish_en: true
+            scan_bodyframe_pub_en: true
+
+        pcd_save:
+            pcd_save_en: true
+            interval: -1
