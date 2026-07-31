@@ -27,8 +27,10 @@ this file is the handoff. Read it fully before making changes.
   a BUELEC 100/1000Base-T1-TX-E converter: rate=100M, mode=MASTER, lidar
   ORANGE pair (Lemo pins 7/8) to terminal block. Web console 192.168.1.201,
   UDP 2368, 600 rpm, 1262-byte legacy P40 packets.
-  Mounted plug-AFT on a welded mast, tilted forward (measured 58.2° from
-  vertical by gravity, not the ~45° originally planned).
+  Mounted plug-AFT on a welded mast, tilted forward (~58° from vertical,
+  gravity-derived, not the ~45° originally planned). Don't write it with a
+  decimal — the accel bias is uncalibrated until the allan_variance_ros run,
+  so tenths overstate the precision.
 - **IMU** — ICM-42688-P on XIAO ESP32-S3 (SPI: D10 MOSI, D9 MISO, D8 SCK,
   D7 CS, D6 INT1). ±1000 dps / ±8 g, 200 Hz ODR (reg 0x27 per DS-000347;
   measured ~201 Hz). Scale: 4096 LSB/g, 32.8 LSB/dps. Publishes rad/s and
@@ -69,7 +71,14 @@ this file is the handoff. Read it fully before making changes.
     mismatch silently starves FAST-LIO2 forever. PTP is the later upgrade
     that makes type 0 correct (`ptp4l` master + console Clock Source→PTP).
   - line 15 firetimes path set to the real Pandar40P firetime CSV.
-  - placeholders must be `""` (multicast_ip_address, channel fov path).
+  - `multicast_ip_address` must be `""` (it is passed straight to
+    SocketSource).
+  - `channel_fov_filter_path` keeps the stock placeholder string in the
+    working config — verified harmless. `ParseChannelFovFilterPath`
+    (`libhesai/lidar_types.h` ~253) returns -1 with an empty filter map
+    both for `""` and for a nonexistent path; the only difference is one
+    cosmetic `LogError` at startup.
+  - live copy of this file is committed at `ros2/config/hesai_config.yaml`.
 - **FAST-LIO2 local patches (in repo `patches/fastlio_pandar40p.patch`):**
   1. `src/preprocess.h` ~76: `float time;` → `double time;` and macro
      `(float, time, time)` → `(double, time, timestamp)`. Float would
