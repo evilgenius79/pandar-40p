@@ -161,5 +161,7 @@ docs/imu_extrinsic.md.
   over CLI incantations; paste-ready commands with absolute paths.
 - Diff proposed doc changes against the live repo rather than assuming a
   rewrite wins. Matt handles image links himself.
+- Push straight to main (standing permission, 2026-07-31) — no PRs or
+  side branches unless Matt asks.
 - The dog is Bobo. He has appeared in both the first camera image and the
   first point cloud, and has a standing role as scan-quality control.
