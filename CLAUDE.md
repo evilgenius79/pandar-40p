@@ -28,17 +28,12 @@ this file is the handoff. Read it fully before making changes.
     signature. Use this bag.
   - `run_20260729_215544` (87 s, 871 lidar frames, 17,530 IMU) — the
     first bag that mapped, and the one the timestamp-domain work was done
-    against. **No longer on disk** (gone from `~/bags` and from Trash by
-    15:37 on 2026-07-31; not deleted by any tooling in this repo). Matt's
-    position is that it predates the IMU remount and is only valid for
-    timestamp work. That could not be confirmed once the file was gone,
-    and two pieces of indirect evidence point the other way: replaying it
-    kept the estimated extrinsic rotation within ~2.6° of identity (a
-    flat IMU under the 58°-tilted lidar would need ~58° of correction),
-    and the accepted gravity check recorded above for the co-mount
-    (+0.165 / +8.392 / +5.194) is itself the tilted signature. Treat the
-    question as open, not settled; it no longer matters operationally
-    since the bag is gone.
+    against. It predates the IMU remount, so it was only ever valid for
+    timestamp work, not SLAM or extrinsic work. **Deleted by Matt on
+    2026-07-31** as no longer needed. Its mount was never verified by
+    measurement and now cannot be; if the pre-/post-remount boundary ever
+    matters again, note that the accepted co-mount gravity check recorded
+    below (+0.165 / +8.392 / +5.194) is not itself dated.
 
 ## Hardware (all verified working)
 
