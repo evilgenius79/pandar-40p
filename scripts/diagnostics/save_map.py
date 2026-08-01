@@ -79,6 +79,14 @@ def main():
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+    except Exception as exc:                       # noqa: BLE001
+        # rclpy raises ExternalShutdownException when SIGINT arrives, which
+        # it handles itself rather than letting Python raise KeyboardInterrupt.
+        # The PCD still gets written by the finally block below, but the
+        # traceback made a successful run look like a crash. Swallow it by
+        # name without importing a version-specific symbol.
+        if type(exc).__name__ != 'ExternalShutdownException':
+            raise
     finally:
         write_pcd()
 

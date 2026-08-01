@@ -12,11 +12,34 @@ Column layout, from laserMapping.cpp:1103 (fout_out <<):
   19..21 ba
   22..   grav, feats_undistort size
 """
+import os
+import re
 import sys
 import statistics as st
 
 path = sys.argv[1]
 tag = sys.argv[2] if len(sys.argv) > 2 else path
+
+CFG = os.path.expanduser("~/ros2_ws/src/FAST_LIO/config/pandar40p.yaml")
+
+
+def declared_extrinsic_T(cfg=CFG):
+    """Read extrinsic_T out of the live config.
+
+    Hardcoding it here was a real bug: the config moved to
+    [-0.057,-0.023,0.047] on 2026-08-01 and this script kept reporting
+    deltas against the retired [0,0,0.07], which made the comparison
+    silently meaningless. Read it, don't remember it.
+    """
+    try:
+        with open(cfg) as fh:
+            m = re.search(r"^\s*extrinsic_T:\s*\[([^\]]+)\]", fh.read(), re.M)
+        if not m:
+            return None
+        vals = [float(x) for x in m.group(1).split(",")]
+        return vals if len(vals) == 3 else None
+    except OSError:
+        return None
 
 rows = []
 for line in open(path):
@@ -66,6 +89,19 @@ for nm, v, u in (("R roll", rx, "deg"), ("R pitch", ry, "deg"), ("R yaw", rz, "d
                  ("T x", tx, "m"), ("T y", ty, "m"), ("T z", tz, "m")):
     stats(nm, v, u)
 print()
-print("hand measurement: extrinsic_T = [0, 0, 0.07] m, extrinsic_R = identity (0,0,0 deg)")
-print(f"final delta vs hand:  dT = [{tx[-1]-0:+.5f}, {ty[-1]-0:+.5f}, {tz[-1]-0.07:+.5f}] m")
-print(f"                      dR = [{rx[-1]:+.4f}, {ry[-1]:+.4f}, {rz[-1]:+.4f}] deg")
+decl = declared_extrinsic_T()
+if decl is None:
+    print(f"could not read extrinsic_T from {CFG} -- skipping the delta")
+else:
+    print(f"declared in config: extrinsic_T = {decl} m, extrinsic_R = identity")
+    dT = [tx[-1] - decl[0], ty[-1] - decl[1], tz[-1] - decl[2]]
+    print(f"final delta vs declared:  dT = [{dT[0]:+.5f}, {dT[1]:+.5f}, {dT[2]:+.5f}] m")
+    print(f"                          dR = [{rx[-1]:+.4f}, {ry[-1]:+.4f}, {rz[-1]:+.4f}] deg")
+    print()
+    moved = max(abs(v) for v in dT)
+    if moved < 0.002:
+        print(f"  NOTE T moved at most {moved*1000:.1f} mm from where it was")
+        print("       initialized. On this rig T has never been observably")
+        print("       estimated -- see CLAUDE.md, the retracted 'translation")
+        print("       confirms the tape measure' bullet. Do not read the")
+        print("       agreement below as confirmation of the hand measurement.")

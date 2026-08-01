@@ -155,7 +155,26 @@ tail -3 "$HOME/save_map.log" | sed 's/^/  /'
 echo
 
 echo "----- stopping mapper (SIGINT so mat_out.txt flushes) -----"
+# SIGINT to the `ros2 launch` wrapper alone does NOT reach the nodes it
+# spawned -- observed 2026-08-01, where fastlio_mapping and rviz2 kept
+# running and the script blocked in wait() forever. Signal the actual node
+# processes by name, then escalate if they ignore it.
 kill -INT "$MAPPER_PID" 2>/dev/null
+pkill -INT -f fastlio_mapping 2>/dev/null
+pkill -INT -f "rviz2 -d" 2>/dev/null
+for _ in $(seq 1 15); do
+    pgrep -f fastlio_mapping >/dev/null 2>&1 || break
+    sleep 1
+done
+if pgrep -f fastlio_mapping >/dev/null 2>&1; then
+    echo "  WARN mapper ignored SIGINT for 15 s; escalating to SIGTERM."
+    echo "       mat_out.txt may be missing its last few rows."
+    pkill -TERM -f fastlio_mapping 2>/dev/null
+    sleep 3
+    pkill -KILL -f fastlio_mapping 2>/dev/null
+fi
+pkill -TERM -f "rviz2 -d" 2>/dev/null
+kill -TERM "$MAPPER_PID" 2>/dev/null
 wait "$MAPPER_PID" 2>/dev/null
 MAPPER_PID=""
 sleep 1
