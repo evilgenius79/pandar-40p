@@ -161,11 +161,22 @@ this file is the handoff. Read it fully before making changes.
     rate. **15 fps at full resolution is the usable ceiling for both**, and
     that is ample — at the measured 0.93 m/s walking pace it is 6 cm
     between frames.
-  - **UNTESTED, and worth testing before the panel bond:** whether camera
-    streaming disturbs IMU timing. The XIAO shares Bus 001 with both
-    cameras, and FAST-LIO depends on clean IMU timestamps (currently
-    median 4.972 ms, max 5.0 ms, zero dropouts — measured with cameras
-    idle). Script ready; needs the XIAO plugged in.
+  - **Camera streaming does NOT disturb IMU timing — tested 2026-08-01.**
+    This was the one that could have blocked the panel bond.
+
+    | | rate | median | p99.9 | max | gaps >15 ms |
+    |---|---|---|---|---|---|
+    | cameras idle | 201.6 Hz | 4.973 ms | 4.992 | 4.999 | 0 |
+    | both streaming @ 3200×1200 15 fps | 201.5 Hz | 4.972 ms | 4.993 | 5.002 | 0 |
+
+    Indistinguishable. With the XIAO on root port 4 and the cameras behind
+    the hub on port 8 they do not contend. Safe to proceed with aiming and
+    bonding.
+  - **A USB 3.0 hub will NOT raise the 30 fps ceiling.** A USB3 hub
+    contains a separate internal USB 2.0 hub, and USB 2.0 devices connect
+    to *that*, sharing its single 480 Mb/s upstream exactly as now. The
+    only real fixes are one camera per root port with no hub between, or
+    living at 15 fps — which is ample.
 - Bridge serial: XIAO must be plugged in BEFORE launch — bridge node
   hardcodes `/dev/ttyACM0`. udev symlink is a wanted nicety.
 
