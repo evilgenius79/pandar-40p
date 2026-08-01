@@ -770,6 +770,14 @@ repeats before it means anything.
   over CLI incantations; paste-ready commands with absolute paths.
 - Diff proposed doc changes against the live repo rather than assuming a
   rewrite wins. Matt handles image links himself.
+- **Record decisions that came from discussion, not just from
+  measurement.** Observed failure 2026-08-01: every experimental result
+  was committed within minutes, while four decisions reached purely by
+  reasoning — spin rate, the second SSD, the battery-monitor design, the
+  camera-vs-lidar primacy question — existed only in chat until an audit
+  caught them. Running an experiment and writing it up feels like one
+  action; answering a question does not. If a question got settled with a
+  reason, that reason belongs here, or it will be re-litigated.
 - Push straight to main (standing permission, 2026-07-31) — no PRs or
   side branches unless Matt asks.
 - The dog is Bobo. He has appeared in both the first camera image and the
