@@ -4,9 +4,17 @@
 Reads the .db3 directly with sqlite3 (no rosbag2 metadata, no ros2 CLI) and
 deserializes sensor_msgs/msg/Imu with rclpy.
 
-Mount signature (see CLAUDE.md / docs/imu_extrinsic.md):
-  co-mounted, tilted with the lidar -> ay ~ +8.4, az ~ +5.2
-  flat-mounted                      -> az ~ +9.8, ay ~ 0
+Mount signature (see CLAUDE.md / docs/imu_extrinsic.md). The IMU was
+reseated 2026-07-31; the tilt of +Z from gravity is what tells the two
+co-mount eras apart, and every bag recorded before that date is on the
+crooked one:
+
+  reseated co-mount (2026-07-31 on) -> ay ~ +6.9, az ~ +7.1, tilt ~44.5 deg
+  crooked co-mount  (pre 2026-07-31)-> ay ~ +8.5, az ~ +5.1, tilt ~58.9 deg
+  flat-mounted      (the original)  -> az ~ +9.8, ay ~ 0,    tilt ~0 deg
+
+The crooked era carries 14.4 deg of undeclared roll error: usable for
+SLAM, timestamp and pipeline work, useless for adopting an extrinsic.
 
 usage: bag_grav.py <bag_dir_or_db3> [seconds=5.0]
 
@@ -83,9 +91,28 @@ print(f"  peak |gyro| = {gpk:.4f} rad/s  (expect <~0.05 if truly still)")
 tilt = math.degrees(math.atan2(math.sqrt(amean[0] ** 2 + amean[1] ** 2), amean[2]))
 print(f"  tilt of +Z from gravity = {tilt:.1f} deg")
 print()
-if abs(amean[2]) > 9.0 and abs(amean[1]) < 2.0:
-    print("  => FLAT mount signature (az ~ +9.8)")
-elif amean[1] > 6.0 and 3.0 < amean[2] < 7.5:
-    print("  => CO-MOUNTED / TILTED signature (ay ~ +8.4, az ~ +5.2)")
+yaw_resid = math.degrees(math.asin(max(-1.0, min(1.0, amean[0] / mag))))
+print(f"  residual yaw from ax    = {yaw_resid:+.1f} deg")
+print()
+
+# Classify on tilt angle rather than raw ay/az: it is the quantity the two
+# co-mount eras actually differ in, and it is immune to accel scale error.
+if tilt < 20.0:
+    print("  => FLAT mount signature (tilt ~0 deg) -- pre-co-mount, "
+          "large extrinsic error, not usable for SLAM")
+elif 38.0 <= tilt <= 51.0:
+    print("  => RESEATED CO-MOUNT signature (tilt ~44.5 deg, 2026-07-31 on)")
+    print("     geometry believed straight; valid for extrinsic work")
+elif 53.0 <= tilt <= 65.0:
+    print("  => CROOKED CO-MOUNT signature (tilt ~58.9 deg, pre 2026-07-31)")
+    print("     carries 14.4 deg of undeclared roll error about X.")
+    print("     OK for SLAM/timestamp/pipeline work; NOT for adopting an")
+    print("     extrinsic. See docs/imu_extrinsic.md section 4a.")
 else:
-    print("  => does not match either reference signature; inspect manually")
+    print(f"  => tilt {tilt:.1f} deg matches no known mount era; inspect "
+          "manually before trusting this bag")
+
+if abs(yaw_resid) > 3.0:
+    print(f"  !! residual yaw {yaw_resid:+.1f} deg is large -- gravity cannot")
+    print("     check yaw about the gravity vector, so treat ax as the only")
+    print("     handle on it and re-check the board's +Y against the plug")

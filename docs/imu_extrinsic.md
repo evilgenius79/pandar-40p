@@ -40,6 +40,11 @@ with its axes parallel to the lidar's. Both frames now tilt together, and
 identity is true by construction. A rotation that does not exist cannot be
 entered wrong.
 
+> **Read §4a before trusting that last sentence.** The first co-mount was
+> 14.4° out in roll and nobody checked, because "by construction" sounds
+> like a proof. It is a claim about workmanship and needs measuring like
+> any other.
+
 Rules that made it work:
 
 - **Axis-for-axis, not just plate-parallel.** Matching the mounting plane
@@ -107,20 +112,96 @@ Readings and what they mean:
 | a sign flipped vs expectation | axis inverted — board flipped or a remap in firmware |
 | all of gravity in one axis | rig was not tilted when measured, or board is not on the tilted structure |
 
-**Accepted result on this rig (2026-07-30):**
+**Current result (2026-07-31, after the reseat in §4a):**
+
+```
+ax = +0.273   ay = +6.938   az = +7.062   |a| = 9.904
+```
+
+- `ax` 0.273 / 9.904 → ~1.6° residual yaw. Accepted, though slightly
+  worse than the crooked mount's 1.0° — yaw is the one DOF gravity cannot
+  check, so this is the only handle on it.
+- Positive `ay` and `az` match plug-aft with forward tilt. Signs correct.
+- atan2(6.938, 7.062) → +Z sits **44.5° from vertical**, agreeing with a
+  Klein gauge reading of ~47° on the mount plate and with the ~45° the
+  mast was built to.
+- |a| = 9.904 vs ~9.802 local: ~1.0% accel scale error. FAST-LIO2
+  normalizes this at init. Noted, not actionable.
+
+**Superseded result (2026-07-30), kept because every bag on disk was
+recorded under it:**
 
 ```
 ax = +0.165   ay = +8.392   az = +5.194   |a| = 9.870
 ```
 
-- `ax` 0.165 / 9.87 → ~1° yaw error. Accepted.
-- Positive `ay` and `az` match plug-aft with forward tilt. Signs correct.
-- atan2(8.392, 5.194) → the assembly actually sits ~58° from vertical,
-  not the ~45° the mount was described as. Harmless — FAST-LIO2 estimates
-  gravity at init and any tilt works — but the number worth knowing for
-  coverage planning.
-- |a| = 9.870 vs ~9.802 local: ~0.7% accel scale error. FAST-LIO2
-  normalizes this at init. Noted, not actionable.
+This was read as "the assembly actually sits ~58° from vertical, not the
+~45° the mount was described as — harmless." That conclusion was wrong,
+and §4a is why.
+
+## 4a. The reseat: a clean gravity check is not a correct mount
+
+On 2026-07-31 a Klein angle gauge on the mount plate read ~47°, against
+the 58.9° the IMU had been reporting. The IMU was reseated and rewired,
+after which gravity read 44.5° — agreeing with the gauge.
+
+Rotating the old gravity direction onto the new one:
+
+```
+old unit g = (0.01387, 0.85631, 0.51628)    58.9° from vertical
+new unit g = (0.02757, 0.70055, 0.71307)    44.5° from vertical
+           -> 14.44°, about an axis 99.8% +X   (Y 1.7%, Z 5.6%)
+```
+
+So the board had been sitting **14.4° out in roll**, about the rig's tilt
+axis. Not the mast. The mast was ~45° all along, exactly as planned.
+
+What went wrong methodologically, since the gravity check itself was
+faultless:
+
+- **The check validates the IMU, and only the IMU.** It says where "down"
+  is in the IMU frame. Converting that to a statement about the mast
+  requires assuming the IMU is square to the mast — which is the very
+  thing under test. The reading was used to *correct* the mast's
+  documented angle, which inverts the logic.
+- **"Identity by construction" is a claim about workmanship.** §2 argues,
+  correctly, that a rotation which does not exist cannot be entered
+  wrong. That only holds if the rotation really does not exist. Here it
+  did, at 14.4°, and the phrasing discouraged anyone from checking.
+- **The disagreement was visible for a week and read as a fact.** ~58° vs
+  ~45° planned was written up as an interesting discrepancy rather than as
+  two instruments contradicting each other. A second instrument on a
+  different part of the assembly is what finally broke the tie.
+- **Rule going forward:** after any mount work, gravity-check the IMU *and*
+  gauge the plate. Agreement between two independent instruments is the
+  evidence; either one alone is a hypothesis.
+
+Consequences for the data: every bag recorded before 2026-07-31 carries a
+14.4° roll error between the true geometry and the declared identity
+`extrinsic_R`. Those bags remain valid for SLAM, timestamp and pipeline
+work — the multi-room map was built through this error — but **no
+extrinsic may be adopted from them.**
+
+### Forensic check: what the online estimator saw
+
+`extrinsic_est_en` was running on `run_20260730_221408`, so its converged
+`extrinsic_R` is a record of what a 14.4° misalignment looks like from
+inside the filter. Last-quarter means over 336 scans:
+
+```
+roll -6.116°    pitch +1.120°    yaw +0.612°
+```
+
+- **The axis is right.** The misalignment is roll about X, and roll is
+  where essentially all of the estimator's rotation went. Independent
+  support that the mount was crooked in that plane.
+- **The magnitude is not.** 6.116° out of 14.44° is 42%. Roll was still
+  creeping −0.12° per quarter when the 64 s bag ended, having slid
+  monotonically since t ≈ 15 s, so it may simply not have finished — or it
+  may be absorbing bias rather than geometry. One bag cannot tell.
+- **Practical lesson:** a converged-looking extrinsic with a tight standard
+  deviation (0.04° here) was neither the truth nor identity. Tightness is
+  not accuracy.
 
 ## 5. Config that results
 
@@ -130,8 +211,13 @@ extrinsic_T: [ 0.0, 0.0, 0.07 ]   # lidar optical origin ~7 cm up the spin
 extrinsic_R: [ 1.0, 0.0, 0.0,
                0.0, 1.0, 0.0,
                0.0, 0.0, 1.0 ]
-extrinsic_est_en: true             # correct use now: polishing a small
-                                   # residual, not converging from 45 deg
+extrinsic_est_en: true             # intended as polishing a small residual
+                                   # rather than converging from 45 deg —
+                                   # but on the one bag measured it roamed
+                                   # to 6.1 deg of roll. Left true because
+                                   # true is what produced the known-good
+                                   # map. See CLAUDE.md "Extrinsic
+                                   # estimator".
 ```
 
 On translation precision: rotation error was the runaway term; translation
@@ -147,3 +233,9 @@ at the base plate.
 Same course, same operator, one variable changed: divergent whip before,
 continuous multi-room geometry with planar walls after. Doorway measured
 0.77 m against 0.813 m nominal.
+
+That result stands — but note it was achieved with 14.4° of undeclared
+roll error still in the system (§4a). Co-mounting fixed the gross fault,
+not the residual one. The 0.77 vs 0.813 m shortfall is now a live
+candidate for that 14.4°, alongside the roaming estimator; the first bag
+on the reseated mount is what will tell.
