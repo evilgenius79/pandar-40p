@@ -147,6 +147,21 @@ regenerate it for each bag.
   which silently eats left-clicks. It tells you when that happens.
 - `r` clears all measurements.
 
+**If a map looks uniformly one colour in CloudCompare**, that is the height
+ramp being stretched across outliers, not a broken ramp. The 2026-08-01
+outdoor cloud spans 69 m (trees, plus a stray at +62 m) while 80 % of its
+points sit in the bottom 8 m, so everything real lands in a sliver of the
+scale. Write a pre-coloured cloud instead:
+
+```bash
+python3 ~/pandar-40p/scripts/diagnostics/floorplan.py map.pcd --no-plot --color 0,8
+python3 ~/pandar-40p/scripts/diagnostics/floorplan.py map.pcd --no-plot --color
+```
+
+The first clamps to 0–8 m; bare `--color` clamps to p1–p95 automatically.
+Either writes `<name>_color.pcd` with real RGB, so CloudCompare shows it
+correctly with no Height Ramp step at all.
+
 ## 6. View a map in CloudCompare
 
 Open the `_level.pcd` that `floorplan.py` writes, not the raw one, or Top

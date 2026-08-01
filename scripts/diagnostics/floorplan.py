@@ -104,6 +104,34 @@ def rotation_bringing_to_down(g):
     return np.eye(3) + vx + vx @ vx * ((1 - c) / (s * s))
 
 
+def write_pcd_rgb(path, pts, lo, hi, cmap="turbo"):
+    """Write an XYZ+RGB PCD coloured by height, clamped to [lo, hi].
+
+    CloudCompare's Height Ramp stretches across the FULL z range, and an
+    outdoor cloud spans ~69 m because of trees and strays while 80 % of the
+    points sit in the bottom 8 m. Everything you care about then lands in a
+    sliver of the colour scale and the result looks uniform. Clamping is the
+    whole point of this function.
+    """
+    import matplotlib.cm as cm
+    z = np.clip((pts[:, 2] - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
+    rgb = (np.asarray(cm.get_cmap(cmap)(z))[:, :3] * 255).astype(np.uint32)
+    packed = (rgb[:, 0] << 16) | (rgb[:, 1] << 8) | rgb[:, 2]
+    out = np.empty((len(pts), 4), dtype=np.float32)
+    out[:, :3] = pts[:, :3].astype(np.float32)
+    out[:, 3] = packed.astype(np.uint32).view(np.float32)
+    n = len(out)
+    header = (
+        "# .PCD v0.7 - Point Cloud Data file format\n"
+        "VERSION 0.7\nFIELDS x y z rgb\nSIZE 4 4 4 4\nTYPE F F F F\n"
+        f"COUNT 1 1 1 1\nWIDTH {n}\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\n"
+        f"POINTS {n}\nDATA binary\n"
+    )
+    with open(path, "wb") as fh:
+        fh.write(header.encode("ascii"))
+        fh.write(out.tobytes())
+
+
 def quat_from_matrix(R):
     """(x, y, z, w) from a rotation matrix, for a TF static publisher."""
     t = np.trace(R)
@@ -166,6 +194,11 @@ def main():
     ap.add_argument("--no-plot", action="store_true")
     ap.add_argument("--tf", action="store_true",
                     help="also print an RViz static-TF command for this run")
+    ap.add_argument("--color", nargs="?", const="auto", default=None,
+                    metavar="LO,HI",
+                    help="also write <name>_color.pcd, height-coloured and "
+                         "CLAMPED. Default clamps to p1..p95 of height, which "
+                         "is what makes an outdoor cloud actually readable.")
     ap.add_argument("--mat", default=MAT, help="path to mat_out.txt")
     args = ap.parse_args()
 
@@ -203,6 +236,18 @@ def main():
               f"  --x 0 --y 0 --z 0 "
               f"--qx {q[0]:.6f} --qy {q[1]:.6f} --qz {q[2]:.6f} --qw {q[3]:.6f} \\\n"
               f"  --frame-id map_level --child-frame-id camera_init")
+
+    if args.color:
+        if args.color == "auto":
+            clo, chi = np.percentile(lev[:, 2], [1, 95])
+        else:
+            clo, chi = (float(x) for x in args.color.split(","))
+        cout = os.path.splitext(args.pcd)[0] + "_color.pcd"
+        write_pcd_rgb(cout, lev, clo, chi)
+        print(f"\nwrote {cout}")
+        print(f"  height-coloured, clamped {clo:.2f} .. {chi:.2f} m")
+        print("  open THIS one in CloudCompare -- no Height Ramp needed, and")
+        print("  it will not be washed out by tall trees or stray points.")
 
     lo, hi = args.slab
     sel = lev[(lev[:, 2] >= lo) & (lev[:, 2] <= hi)]
