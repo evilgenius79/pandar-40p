@@ -86,6 +86,41 @@ echo "----- mount signature (which side of the 2026-07-31 reseat?) -----"
 python3 "$DIAG/bag_grav.py" "$BAG" 2>&1 | sed 's/^/  /'
 echo
 
+echo "----- IMU dynamic range (clipping is silent and ruins integration) -----"
+python3 - "$BAG" <<'PY' 2>/dev/null || echo "  (could not read IMU)"
+import glob, math, os, sqlite3, sys
+import numpy as np
+from rclpy.serialization import deserialize_message
+from sensor_msgs.msg import Imu
+hits = glob.glob(os.path.join(sys.argv[1], "*.db3"))
+con = sqlite3.connect(f"file:{hits[0]}?mode=ro", uri=True)
+row = con.execute("SELECT id FROM topics WHERE name='/imu/data_raw'").fetchone()
+if row is None:
+    sys.exit("  no /imu/data_raw")
+A, G = [], []
+for (blob,) in con.execute("SELECT data FROM messages WHERE topic_id=?", (row[0],)):
+    m = deserialize_message(bytes(blob), Imu)
+    a, g = m.linear_acceleration, m.angular_velocity
+    A.append(math.sqrt(a.x**2 + a.y**2 + a.z**2))
+    G.append(math.sqrt(g.x**2 + g.y**2 + g.z**2))
+A, G = np.array(A), np.array(G)
+AFS, GFS = 8 * 9.80665, 1000 * math.pi / 180      # +/-8 g, +/-1000 dps
+print(f"  |accel| p99 {np.percentile(A,99):6.2f}  max {A.max():6.2f} m/s^2   "
+      f"({100*A.max()/AFS:.0f}% of +/-8 g full scale)")
+print(f"  |gyro|  p99 {np.percentile(G,99):6.2f}  max {G.max():6.2f} rad/s    "
+      f"({100*G.max()/GFS:.0f}% of +/-1000 dps)")
+na = int((A > 0.9 * AFS).sum()); ng = int((G > 0.9 * GFS).sum())
+if na or ng:
+    print(f"  !! {na} accel and {ng} gyro samples above 90% of full scale.")
+    print("     Clipping corrupts integration silently. Soften the mount")
+    print("     between the CHASSIS and the mast -- never between IMU and lidar.")
+elif A.max() > 0.5 * AFS:
+    print("  WARN peaks past half of full scale; watch this on rougher ground")
+else:
+    print("  ok   comfortable headroom")
+PY
+echo
+
 echo "----- lidar frames recorded in this bag -----"
 BAG_FRAMES=$(python3 - "$BAG" <<'PY'
 import glob, os, sqlite3, sys

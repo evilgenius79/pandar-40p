@@ -66,6 +66,17 @@ this file is the handoff. Read it fully before making changes.
   a BUELEC 100/1000Base-T1-TX-E converter: rate=100M, mode=MASTER, lidar
   ORANGE pair (Lemo pins 7/8) to terminal block. Web console 192.168.1.201,
   UDP 2368, 600 rpm, 1262-byte legacy P40 packets.
+  **Return mode is DUAL — confirmed from data 2026-08-01**, which resolves
+  the old "144k points/frame" puzzle. A recorded frame has 40 rings ×
+  3,610 points = 144,400, and the busiest ring carries 3,610 points over
+  **1,805 distinct azimuths, a ratio of exactly 2.00**. So azimuth
+  resolution is the spec 0.2° at 10 Hz and the doubling is two returns per
+  firing, not finer sampling. Consequences: it doubles the ~37.6 MB/s
+  stream (and so contributed to the QoS frame drop), and FAST-LIO2 has no
+  concept of return number — it treats a weak second return as an ordinary
+  surface point, so partial hits on edges become spurious geometry. Dual
+  return earns its keep outdoors seeing past vegetation; indoors it is
+  mostly edge noise at double the bandwidth. Not yet A/B tested.
   Mounted plug-AFT on a welded mast, tilted forward **~45–47° from
   vertical** — Klein gauge on the mount plate reads ~47°, post-reseat
   gravity puts IMU +Z 44.5° from vertical, and the mast was built to the
