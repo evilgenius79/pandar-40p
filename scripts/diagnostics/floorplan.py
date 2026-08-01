@@ -104,6 +104,29 @@ def rotation_bringing_to_down(g):
     return np.eye(3) + vx + vx @ vx * ((1 - c) / (s * s))
 
 
+def quat_from_matrix(R):
+    """(x, y, z, w) from a rotation matrix, for a TF static publisher."""
+    t = np.trace(R)
+    if t > 0:
+        s = math.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2, 1] - R[1, 2]) / s
+        y = (R[0, 2] - R[2, 0]) / s
+        z = (R[1, 0] - R[0, 1]) / s
+    else:
+        i = int(np.argmax(np.diag(R)))
+        j, k = (i + 1) % 3, (i + 2) % 3
+        s = math.sqrt(1.0 + R[i, i] - R[j, j] - R[k, k]) * 2
+        q = [0.0, 0.0, 0.0]
+        q[i] = 0.25 * s
+        q[j] = (R[j, i] + R[i, j]) / s
+        q[k] = (R[k, i] + R[i, k]) / s
+        w = (R[k, j] - R[j, k]) / s
+        x, y, z = q
+    n = math.sqrt(x * x + y * y + z * z + w * w)
+    return x / n, y / n, z / n, w / n
+
+
 def empty_run(pts, p0, p1, corridor=0.06):
     """Widest gap in the returns along the segment p0->p1.
 
@@ -141,6 +164,8 @@ def main():
     ap.add_argument("--grav", nargs=3, type=float, default=None,
                     metavar=("X", "Y", "Z"), help="override logged gravity")
     ap.add_argument("--no-plot", action="store_true")
+    ap.add_argument("--tf", action="store_true",
+                    help="also print an RViz static-TF command for this run")
     ap.add_argument("--mat", default=MAT, help="path to mat_out.txt")
     args = ap.parse_args()
 
@@ -168,6 +193,16 @@ def main():
     print(f"wrote {out}")
     print("  in CloudCompare: Top is now a real plan view, and Height Ramp")
     print("  really is height. Use orthographic (not perspective) to measure.")
+
+    if args.tf:
+        q = quat_from_matrix(R)
+        print("\nRViz: publish this, then set Fixed Frame to 'map_level'.")
+        print("  (the angle depends on how the rig sat at t=0, so it is")
+        print("   per-run -- regenerate it for each bag)")
+        print(f"\nros2 run tf2_ros static_transform_publisher \\\n"
+              f"  --x 0 --y 0 --z 0 "
+              f"--qx {q[0]:.6f} --qy {q[1]:.6f} --qz {q[2]:.6f} --qw {q[3]:.6f} \\\n"
+              f"  --frame-id map_level --child-frame-id camera_init")
 
     lo, hi = args.slab
     sel = lev[(lev[:, 2] >= lo) & (lev[:, 2] <= hi)]

@@ -116,7 +116,27 @@ python3 ~/pandar-40p/scripts/diagnostics/floorplan.py map.pcd --no-plot
 ```
 
 It levels by the logged gravity vector, writes `<name>_level.pcd`, and
-opens a top-down plan of a horizontal slab.
+opens a top-down plan of a horizontal slab. `run_test.sh` now does the
+levelling automatically at the end of every replay, so `_level.pcd`
+already exists — this is only needed for one-off maps or to re-slice.
+
+**Why any of this is necessary:** FAST-LIO's world frame `camera_init` is
+the IMU's attitude at t = 0, and this rig's IMU rides a ~45° mast, so
+every map is stored tilted (46–48°, depending on how the rig sat when you
+started). There is no gravity-align option in this FAST-LIO — checked the
+source. So it is corrected on export instead.
+
+**To fix the live RViz view**, add `--tf` and it prints a ready static
+transform for the run:
+
+```bash
+python3 ~/pandar-40p/scripts/diagnostics/floorplan.py map.pcd --no-plot --tf
+```
+
+Run the `static_transform_publisher` line it gives you, then set RViz's
+Fixed Frame to `map_level`. Display only — it never touches `extrinsic_R`,
+which is the rule in docs/imu_extrinsic.md §2. The angle is per-run, so
+regenerate it for each bag.
 
 - **Click two points to measure.** It reports the click-to-click distance
   *and* the widest run with no returns between them — the second is the

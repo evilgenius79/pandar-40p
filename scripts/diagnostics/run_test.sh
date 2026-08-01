@@ -233,8 +233,18 @@ else
     echo "no mat_out.txt written -- was runtime_pos_log_enable true?"
 fi
 
+# The map comes out of FAST-LIO tilted: camera_init is the IMU's attitude at
+# t=0 and this rig's IMU rides a ~45 deg mast. Level it here, once mat_out.txt
+# has flushed, so nothing downstream ever sees the tilted version by accident.
+if [ -s "$MAT" ] && [ -f "$PCD" ]; then
+    echo
+    echo "----- levelling the map against logged gravity -----"
+    python3 "$DIAG/floorplan.py" "$PCD" --no-plot --tf 2>&1 | sed 's/^/  /'
+fi
+
 echo
 echo "=============================================================="
-echo " map : $PCD"
-echo " logs: ~/mapper.log  ~/save_map.log"
+echo " map   : $PCD"
+echo " level : ${PCD%.pcd}_level.pcd   <- use this one"
+echo " logs  : ~/mapper.log  ~/save_map.log"
 echo "=============================================================="
