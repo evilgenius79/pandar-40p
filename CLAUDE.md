@@ -137,10 +137,21 @@ this file is the handoff. Read it fully before making changes.
     or not the GPS is attached.
   - **Firmware pin assignments, read from source rather than from this
     file** (`main.cpp:33-34`, `:115`): `PIN_GPS_RX = D5` at **9600 8N1**,
-    `PIN_PPS = D4`. GPS TX goes to **D5**. Wiring it to D4 instead produces
-    exactly the symptoms seen on 2026-08-01 — `/gps/fix` silent because
-    the UART sees nothing, and `/gps/pps` at ~670 Hz because every NMEA
-    serial edge trips the rising-edge PPS interrupt.
+    `PIN_PPS = D4`. GPS TX goes to **D5**.
+  - **There are TWO distinct PPS faults; do not conflate them.**
+    - *Floating pin.* PPS has never been wired, so D4 sits unterminated
+      with a rising-edge interrupt armed on it, and rings on electrical
+      transients. This is the long-standing "~840/s without fix" and the
+      2026-08-01 outdoor bag's 1,809 edges in 2.6 s at ~50 kHz. **The
+      `INPUT_PULLDOWN` firmware change fixes this one.**
+    - *NMEA driven onto D4.* On 2026-08-01, during the post-IMU-rewire
+      reconnection only, GPS TX was landed on D4 instead of D5. That gives
+      `/gps/fix` silent (the UART on D5 sees nothing) and `/gps/pps` at
+      ~670 Hz (every serial edge trips the interrupt). **A pull-down would
+      NOT have prevented this** — a UART actively drives the line, and a
+      weak internal pull-down cannot suppress a driven signal. Wiring fix
+      only. This fault was new that day; the wiring was correct before the
+      2026-07-31 IMU rewire, so it explains nothing historical.
   - **PPS is not needed for next-step 7.** PTP syncs the lidar to the
     laptop over Ethernet; GPS is not involved. PPS only matters if the
     laptop clock is later disciplined to UTC (`gpsd` + `chrony`), which is

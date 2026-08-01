@@ -116,13 +116,16 @@ void setup() {
 
   pinMode(PIN_CS, OUTPUT); digitalWrite(PIN_CS, HIGH);
   pinMode(PIN_INT1, INPUT);
-  // PULLDOWN, not plain INPUT. D4 was floating with a RISING interrupt on
-  // it, which is the whole history of the "PPS flood": with nothing
-  // attached the pin rings on electrical transients (the 2026-08-01
-  // outdoor bag caught 1,809 edges in a 2.6 s burst at ~50 kHz), and with
-  // anything else attached every edge counts as a pulse. The u-blox
-  // TIMEPULSE output idles low and pulses high, so a pull-down is also the
-  // correct termination when the GPS IS connected.
+  // PULLDOWN, not plain INPUT. PPS has never been wired, so D4 sits
+  // unterminated with a RISING interrupt armed on it and rings on
+  // electrical transients -- the 2026-08-01 outdoor bag caught 1,809 edges
+  // in a 2.6 s burst at ~50 kHz. This fixes that. The u-blox TIMEPULSE
+  // output idles low and pulses high, so a pull-down is also the correct
+  // termination once PPS IS wired.
+  // NOTE: this does NOT protect against a signal being wired to D4 by
+  // mistake. Landing GPS TX here instead of D5 gave ~670 Hz on 2026-08-01,
+  // and a UART actively drives the line -- no internal pull-down can
+  // suppress that. Different fault, wiring fix only.
   pinMode(PIN_PPS, INPUT_PULLDOWN);
 
   SPI.begin();
