@@ -164,6 +164,19 @@ this file is the handoff. Read it fully before making changes.
 
 ## Known landmines
 
+- **The lidar motor injects a 10 Hz line straight into the IMU.** Measured
+  2026-08-01 by FFT of 40 s of live `/imu/data_raw`: a line at 10.01 Hz
+  at **104× the mean** with the lidar powered, which is exactly 600 rpm.
+  Unplugging the lidar drops it to 0.9× (noise floor) and accel sd falls
+  2–3×: x 0.0181→0.0053, y 0.0110→0.0050, z 0.0136→0.0061 m/s². Only
+  unplugged does the IMU meet its own datasheet.
+  - **Powering down the ROS driver does NOT stop this** — the Pandar40P
+    spins whenever it has power, regardless of whether anything is
+    listening. Standby mode or unplugging are the only options.
+  - Consequence for tuning: the *operational* IMU noise is 2–3× the quiet
+    Allan-variance numbers. That argues for keeping FAST-LIO's inflated
+    covariances rather than substituting honest sensor figures — see the
+    caveat `allan.py` prints.
 - **Zero-ranges trap**: NEVER press Save on the web console's Azimuth FOV
   page. It can persist laser_enable all-0 / zero-width laser_range windows
   ⇒ spinning+streaming with all ranges 0x0000. Manual repair failed;
