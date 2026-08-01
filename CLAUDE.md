@@ -326,9 +326,18 @@ power-ups — more support for turn-on bias rather than a moving mount.
   drifting +0.96° and yaw +1.08° across the last quarter alone. T moved
   22 / 17 / 18 mm away from the declared value, monotonically rather than
   settling. Nothing is large in absolute terms, but it is drift, not
-  convergence. **This is the evidence that finally justifies the
-  `extrinsic_est_en: false` A/B** proposed on 2026-07-31 — replay this bag
-  both ways and compare loop closure.
+  convergence.
+  - **A/B RUN 2026-08-01 — INCONCLUSIVE, and that is the finding.**
+    Same bag, same everything, loop-closure gap: `true` 1.342 m (0.57 %),
+    `false` 1.287 m (0.55 %). Pinning looks 55 mm better — but the *same*
+    config gave 1.277 m on the earlier replay, so `true` alone spans
+    65 mm across two runs (replay is not deterministic; scan counts came
+    out 2508 / 2511 / 2485). The est-OFF result sits inside that spread.
+    **The estimator's wandering does not measurably hurt loop closure.**
+    Config left at `true`, which is what produced every known-good map.
+    Settling it properly needs ~4 repeats of each for error bars, roughly
+    35 min of replay, and the prize is a difference of ~0.02 % of path —
+    not worth it unless something else makes the extrinsic suspect.
 - ~~GPS went silent outdoors.~~ **Not a fault — the GPS was simply not
   reconnected after the 2026-07-31 IMU rewire.** `/gps/fix` recorded 0
   messages because nothing was attached. The run is fully valid; FAST-LIO2
