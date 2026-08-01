@@ -51,7 +51,7 @@ Note the firmware's spelling — **`noise_filtring`**, not `noise_filtering`.
 |---|---|---|
 | `index.html` | status dashboard | spin rate, temperature |
 | `setting.html` | main settings form | where NoiseFilter lives |
-| `statistic.html` | uptime, temperature, working hours | |
+| `statistic.html` | uptime, internal temperature, operation-time bands | values are in MINUTES |
 | `config_angle.html` | **the Azimuth FOV page** | historically blamed; treat with care |
 | `upgrade.html` | firmware / calibration upload | |
 
@@ -80,7 +80,7 @@ objects it does not implement.
 | `hesai_info` | yes | Uboot and kernel versions |
 | `ethernet_all` | yes | control IP and stream IP blocks |
 | `workmode` | yes | `WorkMode` |
-| `TimeStatistic` | yes | startups, temperature, total working hours |
+| `TimeStatistic` | yes | startups, temperature, operation time (MINUTES) |
 | `lidar_data&key=lidar_mode` | yes | **return mode** |
 | `lidar_data&key=lidar_range` | yes | azimuth windows, per-laser enables |
 | `lidar_data&key=standbymode` | yes | |
@@ -184,17 +184,40 @@ Control_IP 192.168.1.201/24 gw 192.168.1.1   Stream_IP 172.31.3.44
 `Stream_IP 172.31.3.44` is a leftover from the Zoox fleet network. Harmless
 — `DestIp` is broadcast, so the stream reaches the laptop regardless.
 
-## Fleet history, readable from the device
+## Operation-time counters
 
-`TimeStatistic` on 2026-08-01:
+`TimeStatistic`, read 2026-08-01:
 
 ```
 StartupTimes      35
-TotalWorkingTime  1384      hours
-CurrentTemp       29.57     C
-Time0..Time9      temperature-band histogram (Time4 1146, Time5 238)
+CurrentTemp       31.04 C
+TotalWorkingTime  1388   ->  23 h 08 min
+SystemUptime        20   ->  0 h 20 min   (this boot)
+Time4             1150   ->  19 h 10 min  in 20-40 C
+Time5              238   ->  3 h 58 min   in 40-60 C
 ```
 
-1,384 hours is modest for a robotaxi fleet pull, and the temperature
-histogram concentrated in two adjacent bands suggests a stable
-environment rather than hard outdoor duty.
+**All of these are in MINUTES, not hours.** `pandar.js` renders them as
+`Math.floor(v/60) + ' h ' + v%60 + ' min'`. Reading the raw JSON as hours
+overstates it by 60x — 1388 is 23 hours, not 1388 hours. The value ticked
+1384 -> 1388 across two reads four minutes apart, which confirms both the
+unit and that it counts live.
+
+**This is not Zoox fleet history.** 23 hours is our own usage. Matt saw
+roughly 2 hours on this page earlier in the build, so the counter was
+almost certainly zeroed by the factory reset done during the zero-ranges
+debugging. Whatever the unit did in a robotaxi is not recorded here.
+
+The `Time0..Time9` buckets are temperature bands, and the mapping is
+offset by one from what the id numbers suggest:
+
+| id | band | id | band |
+|---|---|---|---|
+| Time0 | < -40 C | Time5 | 40 ~ 60 C |
+| Time1 | -40 ~ -20 C | Time6 | 60 ~ 80 C |
+| Time2 | -20 ~ 0 C | Time7 | 80 ~ 100 C |
+| Time3 | 0 ~ 20 C | Time8 | 100 ~ 120 C |
+| Time4 | 20 ~ 40 C | Time9 | > 120 C |
+
+So the unit has spent about 4 hours in the 40-60 C band. It runs warm —
+worth watching on a hot day outdoors, where ambient adds to it.

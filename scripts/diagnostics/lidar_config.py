@@ -111,6 +111,29 @@ else:
         print(f"\n  -> per-laser arrays ARE active. {len(bad)} laser(s) disabled"
               f"{'' if not bad else ': ' + str(bad[:10])}")
 
+ts, err = get("TimeStatistic")
+print("\noperation time  (raw values are MINUTES, not hours)")
+if err:
+    print("  ", err)
+else:
+    BANDS = ["< -40 C", "-40..-20 C", "-20..0 C", "0..20 C", "20..40 C",
+             "40..60 C", "60..80 C", "80..100 C", "100..120 C", "> 120 C"]
+
+    def hm(v):
+        v = int(v)
+        return f"{v//60} h {v%60:02d} min"
+
+    show("start-ups", ts.get("StartupTimes"))
+    show("internal temp", ts.get("CurrentTemp", "?") + " C")
+    show("total operation", f"{ts.get('TotalWorkingTime')} min",
+         note=f"  = {hm(ts.get('TotalWorkingTime', 0))}")
+    show("uptime this boot", f"{ts.get('SystemUptime')} min",
+         note=f"  = {hm(ts.get('SystemUptime', 0))}")
+    for i, band in enumerate(BANDS):
+        v = ts.get(f"Time{i}", "0")
+        if int(v):
+            show(f"  in {band}", f"{v} min", note=f"  = {hm(v)}")
+
 for obj, lbl in (("workmode", "work mode"),
                  ("lidar_data&key=standbymode", "standby"),
                  ("lidar_sync&key=sync_angle", "sync")):
