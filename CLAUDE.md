@@ -278,6 +278,60 @@ this file is the handoff. Read it fully before making changes.
   PCDs from save_map.py are XYZ-only ⇒ render white; use Edit → Colors →
   Height Ramp.
 
+## First outdoor run — 2026-08-01, `run_20260801_144508`
+
+234 m sidewalk loop on the jogger stroller (pneumatic tires), 251 s at
+0.93 m/s, out 112 m and back to the start. 2,514 lidar frames, 50,554 IMU.
+Map `~/map_run_20260801_144508_level.pcd`, 465 MB.
+
+**Drift, in the gravity-levelled frame:**
+
+| | |
+|---|---|
+| path length | 233.86 m |
+| loop-closure gap | **1.277 m = 0.55 % of path** |
+| — horizontal | 1.273 m |
+| — vertical | **−0.102 m** |
+| true vertical range | −0.39 .. +1.18 m |
+
+0.55 % is a normal, healthy figure for FAST-LIO2, which has no loop
+closure at all. 10 cm of vertical error over 234 m (0.04 %) is the
+standout — gravity anchors that axis and it shows.
+
+**Pneumatic tires answered the shock question: no isolators needed.**
+
+| | peak \|accel\| | % of ±8 g |
+|---|---|---|
+| indoor, hand-carried | 11.74 m/s² | 15 % |
+| sidewalk, air tires | **32.59 m/s²** | **42 %** |
+
+Peak 3.3 g, and **zero** samples above even 50 % of full scale; gyro
+peaked at 7 %. Rubber isolator mounts are not needed — decision closed.
+
+**Frame accounting held at 99.8 %** (2,508 of 2,514) under 4× the data of
+the indoor run, so the QoS fix scales.
+
+**Mount signature:** tilt 45.6°, peak \|gyro\| 0.0123 rad/s at init.
+Residual yaw from ax was **−0.2°**, against 0.8 / 1.6 / 2.4° on earlier
+power-ups — more support for turn-on bias rather than a moving mount.
+
+### Two things this run flagged
+
+- **The extrinsic estimator wanders on long dynamic runs.** Indoors its
+  last-quarter sd was 0.004–0.024°; here it is 0.026–0.386°, with pitch
+  drifting +0.96° and yaw +1.08° across the last quarter alone. T moved
+  22 / 17 / 18 mm away from the declared value, monotonically rather than
+  settling. Nothing is large in absolute terms, but it is drift, not
+  convergence. **This is the evidence that finally justifies the
+  `extrinsic_est_en: false` A/B** proposed on 2026-07-31 — replay this bag
+  both ways and compare loop closure.
+- **GPS went silent outdoors.** `/gps/fix` recorded **0 messages** over
+  251 s outdoors, where indoors it managed 1 Hz NO_FIX. Meanwhile
+  `/gps/pps` flooded 1,809 messages into 2.6 s (~687 Hz) — the documented
+  PPS-flood quirk, back again. Does not affect SLAM, which ignores GPS,
+  but it blocks next-step 7 (PTP/GPS timing) and wants investigating
+  before then.
+
 ## The "doorway error" was probably never an error (2026-08-01)
 
 The long-standing "0.77 m vs 0.813 m nominal" residual looks like a wrong
