@@ -134,7 +134,38 @@ this file is the handoff. Read it fully before making changes.
     Tier 2 / RTK territory, not SLAM.
 - **Cameras** — 2× ELP-USB3DGS1200P01-H120 dual-lens global shutter
   (OG02B10, 3200×1200, USB2 UVC, MJPEG-always). Mounted, NOT aimed/bonded/
-  calibrated yet. Calibrate LAST, after aim is final.
+  calibrated yet. Calibrate LAST, after aim is final. **Only ONE lens per
+  board is used** — the boards are dual-lens for cost, not for stereo, and
+  the two in-use lenses are splayed ±30–35° for coverage. So camera↔camera
+  sync is irrelevant; what matters is each camera's timestamp relative to
+  the *lidar*.
+  - Devices `/dev/video2` and `/dev/video4` (USB `32e4:2b10`). The odd
+    nodes are metadata-only.
+  - **Every mode is the combined side-by-side dual-lens frame** — 3200×1200
+    is 2 × 1600×1200, 2560×720 is 2 × 1280×720, and so on down. There is
+    no single-lens mode, so using one lens still pays full bandwidth for
+    both and you crop in software.
+  - **USB 2.0 bandwidth measured 2026-08-01.** Both cameras and the XIAO
+    all sit on Bus 001, the USB 2.0 root hub, behind Corechips hubs; this
+    laptop has a single xHCI controller so USB 2.0 devices cannot be
+    spread across buses.
+
+    | config | result |
+    |---|---|
+    | one camera alone, 3200×1200 | 53.4 fps |
+    | **both, 3200×1200 @ 30** | **FAILS** — `VIDIOC_STREAMON: No space left on device` |
+    | both, 3200×1200 @ 15 | works, measured 15.0 / 14.4+ fps |
+    | both, 2560×720 @ 30 | works |
+
+    That is isochronous bandwidth *reservation* exhaustion, not MJPEG data
+    rate. **15 fps at full resolution is the usable ceiling for both**, and
+    that is ample — at the measured 0.93 m/s walking pace it is 6 cm
+    between frames.
+  - **UNTESTED, and worth testing before the panel bond:** whether camera
+    streaming disturbs IMU timing. The XIAO shares Bus 001 with both
+    cameras, and FAST-LIO depends on clean IMU timestamps (currently
+    median 4.972 ms, max 5.0 ms, zero dropouts — measured with cameras
+    idle). Script ready; needs the XIAO plugged in.
 - Bridge serial: XIAO must be plugged in BEFORE launch — bridge node
   hardcodes `/dev/ttyACM0`. udev symlink is a wanted nicety.
 
