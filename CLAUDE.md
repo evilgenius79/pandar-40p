@@ -107,8 +107,12 @@ this file is the handoff. Read it fully before making changes.
   weakest check on the rig since gravity cannot see rotation about
   itself. `allan_variance_ros` (next step 2) settles it.
 - **GPS** — u-blox M10 via XIAO (TX→D5, PPS→D4). ~1 Hz NO_FIX indoors
-  (correct). Historical PPS flood quirk (~840/s without fix); the last bag
-  recorded 0 PPS messages — unexplained change, watch-item.
+  when connected. **Disconnected since the 2026-07-31 IMU rewire and not
+  yet restored.** The "PPS flood" is explained: with D4 unterminated it
+  rings on electrical transients — the 2026-08-01 outdoor bag caught
+  1,809 messages in a 2.6 s burst at ~50 kHz, then nothing. That is a
+  floating pin, not a GPS behaviour. Pull D4 down internally, or reconnect
+  the GPS.
 - **Cameras** — 2× ELP-USB3DGS1200P01-H120 dual-lens global shutter
   (OG02B10, 3200×1200, USB2 UVC, MJPEG-always). Mounted, NOT aimed/bonded/
   calibrated yet. Calibrate LAST, after aim is final.
@@ -325,12 +329,18 @@ power-ups — more support for turn-on bias rather than a moving mount.
   convergence. **This is the evidence that finally justifies the
   `extrinsic_est_en: false` A/B** proposed on 2026-07-31 — replay this bag
   both ways and compare loop closure.
-- **GPS went silent outdoors.** `/gps/fix` recorded **0 messages** over
-  251 s outdoors, where indoors it managed 1 Hz NO_FIX. Meanwhile
-  `/gps/pps` flooded 1,809 messages into 2.6 s (~687 Hz) — the documented
-  PPS-flood quirk, back again. Does not affect SLAM, which ignores GPS,
-  but it blocks next-step 7 (PTP/GPS timing) and wants investigating
-  before then.
+- ~~GPS went silent outdoors.~~ **Not a fault — the GPS was simply not
+  reconnected after the 2026-07-31 IMU rewire.** `/gps/fix` recorded 0
+  messages because nothing was attached. The run is fully valid; FAST-LIO2
+  ignores GPS entirely.
+  - **But it did reveal what the "PPS flood" actually is: a floating
+    input, not a GPS quirk.** With nothing connected, `/gps/pps` produced
+    1,809 messages in a **2.6 s burst at t = 22 s** and nothing across the
+    other 226 s, at a median interval of 0.02 ms — **~50 kHz**. No GPS
+    emits that. D4 is floating and rang on some electrical transient. The
+    old note called this a "~840/s quirk without fix"; it is an unterminated
+    pin. Enable an internal pull-down on D4, or just keep the GPS
+    connected, and it should go away.
 
 ## The "doorway error" was probably never an error (2026-08-01)
 
