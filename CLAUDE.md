@@ -115,13 +115,23 @@ this file is the handoff. Read it fully before making changes.
   0.04 g would explain the whole gap, and gravity-derived yaw is the
   weakest check on the rig since gravity cannot see rotation about
   itself. `allan_variance_ros` (next step 2) settles it.
-- **GPS** — u-blox M10 via XIAO (TX→D5, PPS→D4). ~1 Hz NO_FIX indoors
-  when connected. **Disconnected since the 2026-07-31 IMU rewire and not
-  yet restored.** The "PPS flood" is explained: with D4 unterminated it
-  rings on electrical transients — the 2026-08-01 outdoor bag caught
-  1,809 messages in a 2.6 s burst at ~50 kHz, then nothing. That is a
-  floating pin, not a GPS behaviour. Pull D4 down internally, or reconnect
-  the GPS.
+- **GPS** — u-blox M10 via XIAO. **Only power, ground and TX→D5 have ever
+  been wired. PPS→D4 was documented here but never actually connected** —
+  corrected 2026-08-01 on Matt's account of the wiring. ~1 Hz NO_FIX
+  indoors when the TX line is up; disconnected during the 2026-07-31 IMU
+  rewire and being restored.
+  - **That fully explains the "PPS flood".** D4 has been floating since
+    day one, and the XIAO firmware raises an interrupt on it and forwards
+    `0xAA 0x57` packets over serial, which the bridge republishes on
+    `/gps/pps`. The 2026-08-01 outdoor bag caught 1,809 of them in a 2.6 s
+    burst at ~50 kHz, then nothing for 226 s. No GPS emits that. The old
+    "~840/s quirk without fix" was never GPS behaviour at all.
+  - **Fix is in XIAO firmware, not wiring**: set D4 to `INPUT_PULLDOWN`,
+    or disable the PPS interrupt while nothing is connected.
+  - **PPS is not needed for next-step 7.** PTP syncs the lidar to the
+    laptop over Ethernet; GPS is not involved. PPS only matters if the
+    laptop clock is later disciplined to UTC (`gpsd` + `chrony`), which is
+    Tier 2 / RTK territory, not SLAM.
 - **Cameras** — 2× ELP-USB3DGS1200P01-H120 dual-lens global shutter
   (OG02B10, 3200×1200, USB2 UVC, MJPEG-always). Mounted, NOT aimed/bonded/
   calibrated yet. Calibrate LAST, after aim is final.
