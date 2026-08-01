@@ -203,6 +203,27 @@ roll -6.116°    pitch +1.120°    yaw +0.612°
   deviation (0.04° here) was neither the truth nor identity. Tightness is
   not accuracy.
 
+### Confirmed by the first post-reseat bag (2026-08-01)
+
+`run_20260801_014240`, 228 scans over 66.7 s, same replay path:
+
+```
+roll +0.644°   pitch +0.384°   yaw -0.262°     (sd 0.006 - 0.011°)
+```
+
+Identity within two-thirds of a degree on every axis, against −6.116° of
+roll before. This separates the two hypotheses that a single bag could
+not on 2026-07-31: **the −6.1° was the mount being crooked, not the
+estimator wandering.** `extrinsic_est_en: true` refines correctly when the
+declared extrinsic is true, exactly as §2 assumed and as upstream
+documents. The identity claim in §2 is now backed by measurement.
+
+T is a different story and did not improve. It settled 0.9 mm from the
+declared value, having moved 0.9 mm from where it was initialized —
+inactivity again, this time starting from a correct number. Consistent
+with being right; not evidence for it. See the retracted bullet in
+CLAUDE.md; `analyze_ext.py` prints the warning automatically now.
+
 ## 5. Config that results
 
 ```yaml

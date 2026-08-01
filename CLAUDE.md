@@ -18,8 +18,17 @@ this file is the handoff. Read it fully before making changes.
 - **The project WORKS as of 2026-07-30**: FAST-LIO2 produces a metrically
   sound multi-room indoor map from a hand-carried pass. Doorway measured
   0.77 m vs 0.813 m nominal.
-- **Bags — which one is good for what. Every bag on disk predates the
-  2026-07-31 IMU reseat, so NONE is valid for adopting an extrinsic.**
+- **Bags — which one is good for what:**
+  - `~/bags/run_20260801_014240` (67 s, 678 lidar frames, 13,651 IMU) —
+    **the first post-reseat bag and the current reference.** `bag_grav.py`
+    gives ax +0.409, ay +6.937, az +7.040, |a| 9.892, peak |gyro| 0.024
+    rad/s, +Z 44.6° from gravity — `RESEATED CO-MOUNT`. This is the bag
+    that validated the reseat (see "Extrinsic estimator" below). Use it
+    for anything extrinsic. Map exported to `~/map_run_20260801_014240.pcd`
+    (1.47 M points @ 2 cm).
+  - Everything below predates the 2026-07-31 reseat and carries 14.4° of
+    undeclared roll error; fine for SLAM/timestamp/pipeline work, void for
+    adopting an extrinsic.
   - `~/bags/run_20260730_221408` (64 s, 642 lidar frames, 12,940 IMU) —
     the bag behind the known-good multi-room map, and the only bag whose
     mount was verified by measurement rather than by label:
@@ -57,11 +66,18 @@ this file is the handoff. Read it fully before making changes.
   measured ~201 Hz). Scale: 4096 LSB/g, 32.8 LSB/dps. Publishes rad/s and
   m/s² (verified: peak gyro 0.5–0.8 walking, |a| 10.02).
   **Physically co-mounted under the lidar, axes parallel to the lidar's.**
-  **Reseated and rewired 2026-07-31.** Current gravity check: ax +0.273,
-  ay +6.938, az +7.062, |a| 9.904, +Z 44.5° from vertical (~1.6° yaw
-  residual from ax). Superseded crooked-mount check, kept because every
-  bag on disk was recorded under it: ax +0.165, ay +8.392, az +5.194,
-  +Z 58.9° from vertical.
+  **Reseated and rewired 2026-07-31; alignment validated 2026-08-01** by
+  the estimator landing at roll +0.64°, pitch +0.38°, yaw −0.26°. Bench
+  gravity check: ax +0.273, ay +6.938, az +7.062, |a| 9.904, +Z 44.5°.
+  On the 8/01 bag: ax +0.409, ay +6.937, az +7.040, +Z 44.6°.
+  Superseded crooked-mount check, kept because the older bags were
+  recorded under it: ax +0.165, ay +8.392, az +5.194, +Z 58.9°.
+  **Watch-item — the ax-derived yaw residual is creeping**: 0.8° (7/30
+  bag) → 1.6° (7/31 bench) → 2.4° (8/01 bag). The estimator disagrees,
+  putting yaw at −0.26°. Prime suspect is uncalibrated accel X bias:
+  0.04 g would explain the whole gap, and gravity-derived yaw is the
+  weakest check on the rig since gravity cannot see rotation about
+  itself. `allan_variance_ros` (next step 2) settles it.
 - **GPS** — u-blox M10 via XIAO (TX→D5, PPS→D4). ~1 Hz NO_FIX indoors
   (correct). Historical PPS flood quirk (~840/s without fix); the last bag
   recorded 0 PPS messages — unexplained change, watch-item.
@@ -137,6 +153,11 @@ this file is the handoff. Read it fully before making changes.
 - Rig launch: `~/Desktop/rig_launch_v2.py` (repo `launch/rig.launch.py`) =
   hesai driver + its RViz + sensor bridge + optional `record:=true` bag.
 - Recording protocol: hold dead still 3–5 s at start (gravity/bias init).
+- **Replay/export/analyse is one command**:
+  `scripts/diagnostics/run_test.sh [bag] [voxel]` — preflight, mount
+  signature, mapper, PCD export, extrinsic analysis, frame-drop count.
+- **`docs/commands.md` is the command cheatsheet** — record, replay,
+  diagnostics, CloudCompare, DDS unwedging, web-console warnings.
 
 ## Known landmines
 
@@ -171,9 +192,12 @@ this file is the handoff. Read it fully before making changes.
   Nothing purged — Matt's call 2026-07-31; disk is 19% used with 722 GB
   free, so there is no pressure. Earlier note here said "seven, ~20 GB";
   both numbers were wrong.
-- **~45% of lidar frames never reach the mapper on bag replay** — 483 of
-  871 on the since-deleted 7/29 bag, 336 of 642 on the 7/30 bag (one
-  `mat_out.txt` row = one processed scan). Not compute-bound: the mapper
+- **Half to two-thirds of lidar frames never reach the mapper on bag
+  replay, and it is getting worse** — 483 of 871 on the since-deleted 7/29
+  bag (45% dropped), 336 of 642 on the 7/30 bag (48%), **228 of 678 on the
+  8/01 bag (66%)** (one `mat_out.txt` row = one processed scan). The
+  post-reseat map was therefore built from a third of the data. Not
+  compute-bound: the mapper
   spends ~5 ms/frame against a 100 ms budget, and `standard_pcl_cbk`
   (`laserMapping.cpp:283`) has no drop logic. Prime suspect is the
   subscription QoS — `rclcpp::SensorDataQoS()` at `laserMapping.cpp:927`
@@ -242,11 +266,43 @@ replay. **The prediction is half right, and the half it gets wrong matters.**
   to be neither the mount (14.4°) nor identity (0°). It is a number the
   filter stopped at.
 
-## Extrinsic estimator (measured 2026-07-31, next-step 1 — PARTIAL)
+## Extrinsic estimator — RESOLVED for R (2026-08-01)
 
-**All numbers in this section are pre-reseat**, recorded through the 14°
-crooked mount described above. They stand as a measurement of what the
-estimator did, not as a candidate extrinsic.
+`run_20260801_014240`, first bag on the reseated mount, 228 scans over
+66.7 s. Last-quarter means (n = 57), against the pre-reseat run:
+
+| | pre-reseat (7/30) | **post-reseat (8/01)** | sd (8/01) |
+|---|---|---|---|
+| R roll | −6.116° | **+0.644°** | 0.006° |
+| R pitch | +1.120° | **+0.384°** | 0.007° |
+| R yaw | +0.612° | **−0.262°** | 0.011° |
+| T x | +0.00125 m | −0.05762 m | 0.17 mm |
+| T y | +0.00073 m | −0.02214 m | 0.06 mm |
+| T z | 0.06908 m | 0.04615 m | 0.09 mm |
+
+- **The reseat is validated and the R question is answered.** Given
+  straight geometry the estimator sits at identity within 0.65° on every
+  axis instead of sliding 6° away. So the −6.1° was *the mount being
+  crooked*, not the filter wandering — the two hypotheses that one bag
+  could not separate on 2026-07-31. `extrinsic_est_en: true` behaves
+  correctly when the declared extrinsic is true. **"Identity by
+  construction" is now earned by measurement rather than asserted.**
+- **T still tells you nothing.** It landed 0.9 mm from the declared
+  value — but it only *moved* 0.9 mm from where it was initialized. Same
+  inactivity as before, starting from a correct value this time. This run
+  is *consistent with* T being right; it is not evidence for it. The
+  decisive evidence remains the 7/30 run, where T was initialized ~6 cm
+  wrong and still did not move. `analyze_ext.py` now prints this caveat
+  automatically whenever T moves less than 2 mm.
+- Do not re-adopt anything from the pre-reseat rows above; they are kept
+  only as the record of what a 14.4° misalignment looks like from inside
+  the filter.
+
+### Method, and the pre-reseat run
+
+**The numbers in this subsection are pre-reseat**, recorded through the
+14° crooked mount. They stand as a measurement of what the estimator did,
+not as a candidate extrinsic.
 
 Run the bag through the mapper with `runtime_pos_log_enable: true`, which
 writes `~/ros2_ws/src/FAST_LIO/Log/mat_out.txt`. Columns (from
@@ -326,32 +382,38 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
 
 ## Next steps (agreed order)
 
-0. **Capture a fresh bag on the reseated mount.** Blocks everything
-   extrinsic. Same protocol (dead still 3–5 s, hand-carried multi-room
-   pass), then `bag_grav.py` to confirm the ~44.5° signature recorded and
-   `analyze_ext.py` to see where the estimator settles. Expectation now
-   that the geometry is straight: near identity. Nothing on disk can
-   substitute — every existing bag carries the 14° error.
+0. ~~Capture a fresh bag on the reseated mount.~~ **DONE 2026-08-01** —
+   `run_20260801_014240`. Mount signature confirmed, estimator validated.
 1. Compare `extrinsic_est_en`'s converged extrinsic to the hand
-   measurement across runs; adopt if stable. **PARTIAL 2026-07-31, T claim
-   retracted 2026-08-01** — see "Extrinsic estimator" above. Neither half
-   survived: R is void (pre-reseat, and it found 42 % of the known error),
-   and T was never actually estimated — it sat at its initialization. The
-   config now carries the tape measurement
-   [-0.057,-0.023,0.047] rather than anything the filter produced. On the
-   next bag, check whether T *moves at all* before reading meaning into
-   where it lands.
-2. `allan_variance_ros` overnight → real IMU noise params in the config.
+   measurement; adopt if stable. **R RESOLVED 2026-08-01, T unresolved and
+   probably unresolvable this way.** R comes out at identity within 0.65°
+   on the straight mount, which both validates the reseat and clears
+   `extrinsic_est_en: true`. T has never been observably estimated on this
+   rig, so it rests on the tape measure alone
+   ([-0.057,-0.023,0.047]) and no amount of further bags will change that
+   — a deliberate perturbation test would be the only way to probe it, and
+   it is not worth doing while translation error stays at the noise level.
+2. **Measure the doorway in `~/map_run_20260801_014240.pcd`** against
+   0.813 m nominal (0.77 m pre-reseat). Tells you whether the 14.4°
+   contributed to the metric error, or whether the residual is elsewhere —
+   in which case the 66% frame drop is the prime suspect.
+3. **Confirm or kill the frame-drop suspicion** — a reliable-QoS A/B on
+   `laserMapping.cpp:927`. It has gone 45% → 48% → 66% across three bags
+   and is now the largest known unquantified error source. Any
+   density-sensitive result is suspect until this is settled.
+4. `allan_variance_ros` overnight → real IMU noise params in the config.
    Also settles the accel bias, which is why the mast tilt is written
-   ~45–47° and not 44.5°.
-3. Camera work: aim → 3M panel-bond → sharpie witness marks → intrinsics
+   ~45–47° and not 44.5°, and which is the prime suspect for the creeping
+   ax-derived yaw residual.
+5. Camera work: aim → 3M panel-bond → sharpie witness marks → intrinsics
    (checkerboard) → Koide direct_visual_lidar_calibration. One lens per
    board, ±30–35° splay, 10–15° up-pitch. No hardware trigger found (ELP
    email pending); MJPEG-always rule.
-4. Stroller acquisition + mast-to-stroller build.
-5. PTP time sync; revert use_timestamp_type to 0.
-6. Longer outdoor capture with a closed loop to quantify drift.
-7. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
+6. ~~Stroller acquisition + mast-to-stroller build.~~ **DONE** — rig is
+   mounted on a rollator as of the 2026-08-01 photos.
+7. PTP time sync; revert use_timestamp_type to 0.
+8. Longer outdoor capture with a closed loop to quantify drift.
+9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
    dynamic removal → colorize → PINGS/Gaussian-LIC2 splats. 8 GB VRAM ⇒
    chunk scenes. Tier 2 later: ZED-F9P RTK via Indiana InCORS NTRIP (free).
 
