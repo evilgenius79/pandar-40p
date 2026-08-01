@@ -130,11 +130,17 @@ this file is the handoff. Read it fully before making changes.
     `/gps/pps`. The 2026-08-01 outdoor bag caught 1,809 of them in a 2.6 s
     burst at ~50 kHz, then nothing for 226 s. No GPS emits that. The old
     "~840/s quirk without fix" was never GPS behaviour at all.
-  - **Fixed in firmware 2026-08-01**: `firmware/imu_bridge/src/main.cpp`
-    now sets `PIN_PPS` to `INPUT_PULLDOWN` instead of plain `INPUT`.
-    **Needs flashing to take effect.** The u-blox TIMEPULSE output idles
-    low and pulses high, so a pull-down is the correct termination whether
-    or not the GPS is attached.
+  - **Fixed and FLASHED 2026-08-01**: `firmware/imu_bridge/src/main.cpp`
+    sets `PIN_PPS` to `INPUT_PULLDOWN` instead of plain `INPUT`. The
+    u-blox TIMEPULSE output idles low and pulses high, so a pull-down is
+    the correct termination whether or not the GPS is attached. Verified
+    on the device afterwards: `/gps/pps` 0 msgs, `/gps/fix` 1.0 Hz NO_FIX,
+    IMU 201.0 Hz with median 4.973 ms intervals and zero gaps.
+  - **Flashing the XIAO**: PlatformIO is installed in user space
+    (`~/.local/bin/pio`). From `firmware/imu_bridge/`:
+    `pio run` builds (~48 s), `pio run -t upload` flashes (~12 s, auto-resets
+    via RTS, no BOOT button needed). **Stop the bridge first** — it holds
+    `/dev/ttyACM0` open and the upload will fail otherwise.
   - **Firmware pin assignments, read from source rather than from this
     file** (`main.cpp:33-34`, `:115`): `PIN_GPS_RX = D5` at **9600 8N1**,
     `PIN_PPS = D4`. GPS TX goes to **D5**.
