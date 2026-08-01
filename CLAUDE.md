@@ -253,6 +253,45 @@ for a week. Use `scripts/diagnostics/floorplan.py` for any future map
 measurement — it levels by the logged gravity vector and finds edges from
 the data instead of from where you click.
 
+## IMU noise, measured (2026-08-01, 8.58 h static)
+
+`~/bags/allan_20260801_031155`, 6.21 M samples at 201.1 Hz, lidar
+**unplugged**, house asleep — hourly probes confirm az sd 0.0060–0.0078
+throughout, so the whole capture is clean. Analysed with
+`scripts/diagnostics/allan.py` (not `allan_variance_ros`, which is ROS 1
+only). Plot at `~/allan.png`.
+
+| | noise density | vs datasheet | bias instability | vs datasheet |
+|---|---|---|---|---|
+| gyro x | 1.98 mdps/√Hz | better | 2.27 °/hr | ~at spec |
+| gyro y | 1.62 mdps/√Hz | better | 3.48 °/hr | 1.4× worse |
+| gyro z | 1.82 mdps/√Hz | better | **7.07 °/hr** | **2.8× worse** |
+| accel x | 42.1 µg/√Hz | better | 13.2 µg | |
+| accel y | 41.2 µg/√Hz | better | 17.3 µg | |
+| accel z | 52.3 µg/√Hz | better | **53.7 µg** | |
+
+Datasheet: gyro 2.8 mdps/√Hz and ~2.5 °/hr, accel 70 µg/√Hz. **Every axis
+beats the datasheet on white noise.** Bias instability is at or somewhat
+worse than spec, with z the weak axis on both sensors.
+
+- **Do NOT paste the derived covariances into the config.** Measured:
+  `gyr_cov 9.9e-10`, `acc_cov 2.0e-7`, `b_gyr_cov 3.6e-12`,
+  `b_acc_cov 1.6e-9`. The config runs FAST-LIO's defaults of 0.1 / 0.1 /
+  1e-4 / 1e-4 — **five to eight orders of magnitude higher**. That gap is
+  not an error to correct: the process noise absorbs un-modelled error
+  (vibration, deskew residual, extrinsic residual), and the operational
+  figure is also 2–3× the quiet one because the lidar spins while mapping.
+  Treat any change as an A/B against a known-good bag.
+- **Watch-item CLOSED: the "creeping ax yaw residual" is turn-on bias,
+  not a mount problem.** `ax` across sessions read +0.137, +0.165, +0.273,
+  +0.409 m/s² — a spread of 0.27, which is **2,083× the measured x-axis
+  bias instability** of 0.130 mm/s². It cannot be drift. A ±20–40 mg
+  zero-g offset, ordinary for this part and re-rolled on every power
+  cycle, maps to ±1.15–2.29° of apparent yaw, covering the observed
+  0.8–2.4° range exactly. So gravity-derived yaw carries ~±2° of
+  irreducible uncertainty on this rig unless the accel is bias-calibrated
+  by a tumble test. Do not read small changes in it as mount movement.
+
 ## IMU reseat 2026-07-31 — the old mount was 14° crooked
 
 The IMU was reseated and rewired on the bench. Gravity before and after,
@@ -445,10 +484,14 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    `laserMapping.cpp:927`. It has gone 45% → 48% → 66% across three bags
    and is now the largest known unquantified error source. Any
    density-sensitive result is suspect until this is settled.
-4. `allan_variance_ros` overnight → real IMU noise params in the config.
-   Also settles the accel bias, which is why the mast tilt is written
-   ~45–47° and not 44.5°, and which is the prime suspect for the creeping
-   ax-derived yaw residual.
+4. ~~`allan_variance_ros` overnight.~~ **DONE 2026-08-01** — 8.58 h
+   static capture, analysed with our own `allan.py`. See "IMU noise,
+   measured" above. Outcome: every axis beats the datasheet on white
+   noise; the config is deliberately left at FAST-LIO's defaults; and the
+   creeping ax yaw residual is closed as turn-on bias. Remaining option,
+   low priority: a tumble test to calibrate absolute accel bias, which
+   Allan variance cannot measure — that is what would tighten the ±2°
+   uncertainty on gravity-derived yaw.
 5. Camera work: aim → 3M panel-bond → sharpie witness marks → intrinsics
    (checkerboard) → Koide direct_visual_lidar_calibration. One lens per
    board, ±30–35° splay, 10–15° up-pitch. No hardware trigger found (ELP
