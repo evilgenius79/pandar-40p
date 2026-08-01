@@ -121,8 +121,12 @@ this file is the handoff. Read it fully before making changes.
   lid_topic /lidar_points, imu_topic /imu/data_raw, time_sync_en false,
   lidar_type 2, scan_line 40, timestamp_unit 0 (⇒ time_unit_scale 1.e3,
   correct), blind 0.5, point_filter_num 3, filter sizes 0.5,
-  extrinsic_T [0,0,0.07] (7 cm tape-measured, IMU→optical origin up the
-  spin axis), extrinsic_R identity (true by construction),
+  extrinsic_T [-0.057,-0.023,0.047] (tape-measured 2026-08-01 after the
+  reseat: IMU sits 5.7 cm +X/left, 2.3 cm +Y/aft, 4.7 cm below the lidar
+  centre; extrinsic_T is the lidar in IMU axes, so it is the negation —
+  convention verified in `laserMapping.cpp:895` → `IMU_Processing.hpp:327`,
+  which applies `R*p_lidar + T`), extrinsic_R identity (true by
+  construction),
   extrinsic_est_en true — but see "Extrinsic estimator" below: it is NOT
   polishing a small residual, it roams several degrees in rotation. Left
   true anyway (Matt's call, 2026-07-31) because that is the configuration
@@ -264,10 +268,22 @@ means (t ≥ 46.7 s, n = 84):
 | R pitch | +1.120° | 0.026° | +0.039° |
 | R yaw | +0.612° | 0.008° | +0.005° |
 
-- **Translation confirms the tape measure.** T z settles at 0.0691 against
-  the hand-measured 0.070 — 0.9 mm apart, with 0.19 mm of jitter. T x and
-  T y stay inside 1.3 mm of zero, as the co-mounted geometry predicts.
-  **No reason to change `extrinsic_T` — [0,0,0.07] is right.**
+- ~~**Translation confirms the tape measure.**~~ **RETRACTED 2026-08-01.**
+  It was written as: T z settles at 0.0691 against the hand-measured 0.070,
+  T x and T y inside 1.3 mm of zero, so [0,0,0.07] is right. That reads
+  agreement into what is actually **inactivity** — T never moved more than
+  ~2 mm from the value it was initialized with. Two independent proofs:
+  - The mount carried a known 14.4° roll error, which puts the lidar
+    origin at **y ≈ +17.5 mm** in the crooked IMU frame (sin 14.44° ×
+    70 mm). The estimator reported y = +0.7 mm. This one follows from the
+    rotation alone and does not depend on anything else being unchanged.
+  - The 2026-08-01 tape measurement puts the true lever arm at
+    **[−0.057, −0.023, 0.047]**, 7.7 cm and mostly *lateral*, against a
+    declared [0,0,0.07]. The estimator found none of the ~6 cm of x. (This
+    one assumes the board did not move far during the reseat — weaker.)
+  **T is effectively unobservable in this data.** A 0.19 mm standard
+  deviation was the initialization sitting still, not convergence — the
+  same trap as the R number, one line down.
 - **Rotation lands at roll −6.1°, and that is NOT adoptable yet.** Within
   this run it looks like genuine convergence: identity until t≈15 s, an
   asymptotic slide to ≈ −6.2°, then a tight hold (sd 0.04°). But a single
@@ -316,12 +332,15 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    `analyze_ext.py` to see where the estimator settles. Expectation now
    that the geometry is straight: near identity. Nothing on disk can
    substitute — every existing bag carries the 14° error.
-1. Compare `extrinsic_est_en`'s converged extrinsic to the [0,0,0.07]
-   hand measurement across runs; adopt if stable. **PARTIAL 2026-07-31** —
-   see "Extrinsic estimator" above. T confirmed to 0.9 mm and needs no
-   change; the reseat does not disturb that, since the 7 cm offset is up
-   the spin axis and the reseat was a rotation. R is unresolved and the
-   pre-reseat −6.1° is now void as a candidate. Config unchanged.
+1. Compare `extrinsic_est_en`'s converged extrinsic to the hand
+   measurement across runs; adopt if stable. **PARTIAL 2026-07-31, T claim
+   retracted 2026-08-01** — see "Extrinsic estimator" above. Neither half
+   survived: R is void (pre-reseat, and it found 42 % of the known error),
+   and T was never actually estimated — it sat at its initialization. The
+   config now carries the tape measurement
+   [-0.057,-0.023,0.047] rather than anything the filter produced. On the
+   next bag, check whether T *moves at all* before reading meaning into
+   where it lands.
 2. `allan_variance_ros` overnight → real IMU noise params in the config.
    Also settles the accel bias, which is why the mast tilt is written
    ~45–47° and not 44.5°.

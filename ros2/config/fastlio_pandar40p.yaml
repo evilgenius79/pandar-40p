@@ -30,7 +30,12 @@
             fov_degree: 360.0
             det_range: 100.0
             extrinsic_est_en: true     # let it refine our hand-measured extrinsic
-            extrinsic_T: [ 0.0, 0.0, 0.07 ]
+            # Lidar origin expressed in IMU axes (offset_T_L_I: laserMapping
+            # .cpp:895 -> IMU_Processing.hpp:327 applies R*p_lidar + T).
+            # Tape-measured 2026-08-01 after the IMU reseat: the IMU sits
+            # 5.7 cm in +X (left), 2.3 cm in +Y (aft) and 4.7 cm below the
+            # lidar centre, so the lidar is at the negation of that.
+            extrinsic_T: [ -0.057, -0.023, 0.047 ]
             extrinsic_R: [ 1.0, 0.0, 0.0,
                            0.0, 1.0, 0.0,
                            0.0, 0.0, 1.0 ]

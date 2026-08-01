@@ -206,8 +206,7 @@ roll -6.116°    pitch +1.120°    yaw +0.612°
 ## 5. Config that results
 
 ```yaml
-extrinsic_T: [ 0.0, 0.0, 0.07 ]   # lidar optical origin ~7 cm up the spin
-                                   # axis from the IMU, measured by tape
+extrinsic_T: [ -0.057, -0.023, 0.047 ]   # lidar origin in IMU axes
 extrinsic_R: [ 1.0, 0.0, 0.0,
                0.0, 1.0, 0.0,
                0.0, 0.0, 1.0 ]
@@ -220,13 +219,38 @@ extrinsic_est_en: true             # intended as polishing a small residual
                                    # estimator".
 ```
 
-On translation precision: rotation error was the runaway term; translation
-error contributes only a constant offset plus centripetal mismatch during
-turns (~0.1 m/s² for ~15 cm at walking pace — noise level). ±1 cm from a
-tape measure is fine, and the online estimation absorbs the rest. The
-lidar's optical origin is *inside* the housing on the rotation axis — its
-height above the mounting face is in the manual's mechanical drawings, not
-at the base plate.
+**Sign convention, verified in source rather than assumed.**
+`extrinsic_T` loads into `Lidar_T_wrt_IMU` (`laserMapping.cpp:895`) and is
+applied as `offset_R_L_I * p_lidar + offset_T_L_I`
+(`IMU_Processing.hpp:327`) — it transforms a point *from* the lidar frame
+*into* the IMU frame. So it is **the lidar origin's position in IMU axes**,
+which is the negation of the intuitive "where is the IMU relative to the
+lidar" that a tape measure gives you. Getting this backwards puts the
+lever arm on the wrong side, doubling rather than cancelling it.
+
+Measured 2026-08-01, post-reseat: the IMU sits **5.7 cm in +X (left),
+2.3 cm in +Y (aft), 4.7 cm below** the lidar centre. Negate for the
+config → `[-0.057, -0.023, 0.047]`. Cross-check on the x sign: +X is LEFT
+on this rig and the board is physically on the left, so the lidar is at
+−X from it.
+
+Note this replaces the earlier `[0, 0, 0.07]`, which described the IMU as
+sitting on the spin axis 7 cm below the optical origin. Two differences
+are unexplained and worth knowing: the ~6 cm of lateral offset is new, and
+z moved 70 → 47 mm. Either the reseat relocated the board, or the two
+measurements used different lidar landmarks — "optical origin up the spin
+axis" then, "lidar centre" now. The optical origin is *inside* the housing
+on the rotation axis, and its height above the mounting face is in the
+manual's mechanical drawings, not at the base plate; that conversion has
+never been done here, so neither number is anchored to the drawing.
+
+Why this is tolerable anyway: rotation error was the runaway term;
+translation error contributes only a constant offset plus a centripetal
+mismatch during turns. The lever arm is now 7.7 cm and mostly lateral,
+giving ω²r ≈ 0.05 m/s² at the measured 0.8 rad/s peak walking rotation —
+noise level against 9.8. ±1 cm from a tape is fine here. What is *not*
+fine is trusting the online estimator to absorb the rest: §4a shows it
+never moved T from its initialization at all.
 
 ## 6. Result
 
