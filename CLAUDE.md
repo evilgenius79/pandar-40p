@@ -681,9 +681,26 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    laptop, confirm `PTPStatus` leaves "Free Run", *then* set
    `use_timestamp_type: 0`. Verify by echoing header stamps, not with
    `ros2 bag info`, whose Start/End come from the recorder's wall clock.
-   **Timebox this** — host-receive jitter is roughly 1 ms, about 1 mm at
-   walking pace, against 1.28 m of measured drift. It is correctness, not
-   accuracy.
+   **This machine has NO PTP hardware, checked 2026-08-01.** `ethtool -T`
+   reports `PTP Hardware Clock: none` on every interface: `enp4s0`
+   (r8169), `wlp3s0` (mt7921e), and a USB 2.5 GbE adapter
+   (`enx00e04c68102f`, r8152 — that driver does not implement PTP). So any
+   PTP here is software-timestamped, tens of microseconds at best.
+   **What it is worth, at the measured 0.93 m/s walking pace:**
+
+   | timing source | position error |
+   |---|---|
+   | host receive time (current) | 0.465 mm |
+   | software PTP (achievable) | 0.047 mm |
+   | hardware PTP | not available |
+
+   **The entire upgrade buys ~0.4 mm against 1,277 mm of measured drift.**
+   It is correctness, not accuracy, and it carries a real risk: type 0
+   without a solid PTP lock is the silent timestamp-domain failure that
+   cost days in July. **Recommendation: defer** until something makes
+   timing matter — the rig on a vehicle, or cameras with hardware sync.
+   The `ptp4l` master config is ready at `ros2/config/ptp4l_lidar.conf`
+   when that day comes.
 8. Longer outdoor capture with a closed loop to quantify drift.
 9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
    dynamic removal → colorize → PINGS/Gaussian-LIC2 splats. 8 GB VRAM ⇒
