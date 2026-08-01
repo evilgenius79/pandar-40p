@@ -31,8 +31,17 @@ this file is the handoff. Read it fully before making changes.
   global scale error. (An earlier note here said −1.33 %; that came from a
   single bin width and a gravity vector belonging to a different run.)
 - **Bags — which one is good for what:**
+  - `~/bags/run_20260801_144508` (251 s, 2,514 lidar frames, 50,554 IMU,
+    8.8 GB) — **the outdoor reference, and the only bag with a closed
+    loop.** 234 m sidewalk loop on the stroller, returns to its start, so
+    it is what drift is scored against: 0.55 %. See "First outdoor run"
+    below. Map at `~/map_run_20260801_144508_level.pcd` (465 MB). GPS was
+    disconnected for this run.
+  - `~/bags/allan_20260801_031155` (8.58 h, 6.21 M IMU samples, 2.3 GB) —
+    static overnight capture with the lidar unplugged, for the Allan
+    variance. Contains no lidar data.
   - `~/bags/run_20260801_014240` (67 s, 678 lidar frames, 13,651 IMU) —
-    **the first post-reseat bag and the current reference.** `bag_grav.py`
+    **the first post-reseat bag and the indoor reference.** `bag_grav.py`
     gives ax +0.409, ay +6.937, az +7.040, |a| 9.892, peak |gyro| 0.024
     rad/s, +Z 44.6° from gravity — `RESEATED CO-MOUNT`. This is the bag
     that validated the reseat (see "Extrinsic estimator" below). Use it
