@@ -1,30 +1,34 @@
-# FAST-LIO2 patches for Hesai Pandar40P (HesaiLidar_ROS_2.0 driver)
-#
-# Apply against the ROS2 branch of https://github.com/hku-mars/FAST_LIO
-# Line numbers are approximate to the state at 2026-07-30; if `patch`
-# rejects hunks, apply by hand — each change is small and the context
-# lines identify the location unambiguously.
-#
-#   cd ~/ros2_ws/src/FAST_LIO
-#   patch -p1 < fastlio_pandar40p.patch
-#   cd ~/ros2_ws && colcon build --packages-select fast_lio
-
---- a/src/preprocess.h
-+++ b/src/preprocess.h
-@@ Point type used by the velodyne-style handler @@
--  float time;
-+  double time;
-
-@@ PCL point registration macro: type AND source field name change @@
--  (float, time, time)
-+  (double, time, timestamp)
-
+diff --git a/src/laserMapping.cpp b/src/laserMapping.cpp
+index e5d9950..f61e915 100644
+--- a/src/laserMapping.cpp
++++ b/src/laserMapping.cpp
+@@ -924,7 +924,17 @@ public:
+         }
+         else
+         {
+-            sub_pcl_pc_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, rclcpp::SensorDataQoS(), standard_pcl_cbk);
++            // SensorDataQoS() is BEST_EFFORT depth 5. Measured 2026-08-01 on
++            // run_20260801_014240: a RELIABLE depth-200 subscriber receives
++            // 677 of 678 frames while a BEST_EFFORT depth-5 one receives 45,
++            // and the mapper itself processed 115. The loss was never compute
++            // (~5 ms/frame against a 100 ms budget) or disk (the bag records
++            // 100% of frames) -- it was this line silently dropping ~2/3 of
++            // the cloud. Playback offers RELIABLE (metadata.yaml reliability:
++            // 1), so this is QoS-compatible.
++            rclcpp::QoS pc_qos(rclcpp::KeepLast(100));
++            pc_qos.reliable();
++            sub_pcl_pc_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, pc_qos, standard_pcl_cbk);
+         }
+         sub_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 10, imu_cbk);
+         pubLaserCloudFull_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 20);
+diff --git a/src/preprocess.cpp b/src/preprocess.cpp
+index 9015782..629b8f0 100644
 --- a/src/preprocess.cpp
 +++ b/src/preprocess.cpp
-@@ void Preprocess::velodyne_handler(...) — after the empty-cloud guard @@
+@@ -304,6 +304,16 @@ void Preprocess::velodyne_handler(const sensor_msgs::msg::PointCloud2::UniquePtr
+   int plsize = pl_orig.points.size();
    if (plsize == 0)
      return;
-+
 +  /*** Hesai driver emits ABSOLUTE epoch seconds per point; FAST-LIO expects
 +       offsets from scan start. Normalize in place. No-op if already relative. ***/
 +  if (pl_orig.points[0].time > 1e8)
@@ -35,5 +39,27 @@
 +      pl_orig.points[i].time -= ts_base;
 +    }
 +  }
-+
    pl_surf.reserve(plsize);
+ 
+   /*** These variables only works when no point timestamps given ***/
+diff --git a/src/preprocess.h b/src/preprocess.h
+index d4d6ddc..62b492c 100644
+--- a/src/preprocess.h
++++ b/src/preprocess.h
+@@ -73,14 +73,14 @@ struct EIGEN_ALIGN16 Point
+ {
+   PCL_ADD_POINT4D;
+   float intensity;
+-  float time;
++  double time;
+   uint16_t ring;
+   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+ };
+ }  // namespace velodyne_ros
+ POINT_CLOUD_REGISTER_POINT_STRUCT(velodyne_ros::Point,
+                                   (float, x, x)(float, y, y)(float, z, z)(float, intensity,
+-                                                                          intensity)(float, time, time)(uint16_t, ring,
++                                                                          intensity)(double, time, timestamp)(uint16_t, ring,
+                                                                                                         ring))
+ 
+ namespace ouster_ros

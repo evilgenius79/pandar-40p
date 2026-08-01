@@ -208,18 +208,27 @@ this file is the handoff. Read it fully before making changes.
   Nothing purged — Matt's call 2026-07-31; disk is 19% used with 722 GB
   free, so there is no pressure. Earlier note here said "seven, ~20 GB";
   both numbers were wrong.
-- **Half to two-thirds of lidar frames never reach the mapper on bag
-  replay, and it is getting worse** — 483 of 871 on the since-deleted 7/29
-  bag (45% dropped), 336 of 642 on the 7/30 bag (48%), **228 of 678 on the
-  8/01 bag (66%)** (one `mat_out.txt` row = one processed scan). The
-  post-reseat map was therefore built from a third of the data. Not
-  compute-bound: the mapper
-  spends ~5 ms/frame against a 100 ms budget, and `standard_pcl_cbk`
-  (`laserMapping.cpp:283`) has no drop logic. Prime suspect is the
-  subscription QoS — `rclcpp::SensorDataQoS()` at `laserMapping.cpp:927`
-  is BEST_EFFORT depth 5, carrying ~35 MB/s of PointCloud2. UNCONFIRMED;
-  would have affected the original live run identically. Worth a
-  reliable-QoS A/B before trusting any density-sensitive result.
+- ~~**Half to two-thirds of lidar frames never reach the mapper.**~~
+  **SOLVED 2026-08-01 — it was the subscription QoS.** History: 483 of 871
+  on the 7/29 bag (45% lost), 336 of 642 on the 7/30 bag (48%), 228 of 678
+  on the 8/01 bag (66%). Measured directly by running two probe
+  subscriptions alongside the real mapper over one replay of the 8/01 bag:
+
+  | subscriber | frames of 678 |
+  |---|---|
+  | RELIABLE, depth 200 | **677** |
+  | BEST_EFFORT, depth 5 (what the mapper used) | 45 |
+  | the mapper itself | 115 |
+
+  `rclcpp::SensorDataQoS()` at `laserMapping.cpp:927` is BEST_EFFORT depth
+  5, carrying ~35 MB/s of PointCloud2, and was silently discarding most of
+  it. Replaced with `rclcpp::QoS(rclcpp::KeepLast(100)).reliable()`.
+  Playback offers RELIABLE (`metadata.yaml` `reliability: 1`) so the
+  profiles are compatible — note that had the publisher been BEST_EFFORT,
+  a RELIABLE subscriber would have received *nothing*, so check before
+  copying this fix elsewhere. **After the fix: 674 of 678 processed
+  (99.4%).** In the patch file. Everything measured on maps built before
+  2026-08-01 used a third to a half of the recorded data.
 - CloudCompare snap can't drive the iGPU (0xa7a8 unsupported by its Mesa);
   it runs anyway (software or NVIDIA offload:
   `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia`).
@@ -480,10 +489,11 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    is very likely a 28-inch door being compared to a 32-inch nominal. See
    "The 'doorway error' was probably never an error" above. Residual task
    is a tape measure on the real doorway, low priority.
-3. **Confirm or kill the frame-drop suspicion** — a reliable-QoS A/B on
-   `laserMapping.cpp:927`. It has gone 45% → 48% → 66% across three bags
-   and is now the largest known unquantified error source. Any
-   density-sensitive result is suspect until this is settled.
+3. ~~Confirm or kill the frame-drop suspicion.~~ **DONE 2026-08-01 — it
+   was real and it is fixed.** BEST_EFFORT depth 5 was dropping two-thirds
+   of the cloud; reliable QoS takes it to 99.4%. See the landmine entry.
+   Worth re-running any density-sensitive conclusion now that the mapper
+   sees 3-6x more data — starting with a fresh map of the 8/01 bag.
 4. ~~`allan_variance_ros` overnight.~~ **DONE 2026-08-01** — 8.58 h
    static capture, analysed with our own `allan.py`. See "IMU noise,
    measured" above. Outcome: every axis beats the datasheet on white
