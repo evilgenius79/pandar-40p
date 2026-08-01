@@ -190,8 +190,9 @@ if [ -s "$MAT" ]; then
     echo "  $SCANS scans processed / $BAG_FRAMES recorded"
     if [ "$BAG_FRAMES" -gt 0 ]; then
         python3 -c "print(f'  {100*(1-$SCANS/$BAG_FRAMES):.0f}% of recorded frames never reached the mapper')"
-        echo "  (known open issue: SensorDataQoS BEST_EFFORT depth 5 is the"
-        echo "   prime suspect, laserMapping.cpp:927 -- still UNCONFIRMED)"
+        echo "  (was ~2/3 before 2026-08-01, when SensorDataQoS BEST_EFFORT"
+        echo "   depth 5 at laserMapping.cpp:927 was replaced with reliable"
+        echo "   QoS. Anything above a few percent now is a new problem.)"
     fi
 else
     echo "no mat_out.txt written -- was runtime_pos_log_enable true?"

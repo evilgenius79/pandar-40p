@@ -17,10 +17,19 @@ this file is the handoff. Read it fully before making changes.
   `~/ros2_ws`. NIC pinned to 192.168.1.100/24.
 - **The project WORKS as of 2026-07-30**: FAST-LIO2 produces a metrically
   sound multi-room indoor map from a hand-carried pass. **Scale verified
-  2026-08-01**: floor→ceiling in the map is 3.0200 m against a tape
-  measurement of 3.0607 m (10 ft 0½ in) — **−1.33 % over a 3 m baseline**,
-  measured from histogram peaks of the two horizontal surfaces, not by
-  eye. There is no global scale error.
+  2026-08-01**, floor→ceiling from histogram peaks of the two horizontal
+  surfaces against a 3.0607 m (10 ft 0½ in) tape measurement, averaged
+  over histogram bin widths 2–15 mm so the method noise is known:
+
+  | | measured | error |
+  |---|---|---|
+  | before the QoS fix | 3.0018 ± 0.0030 m | −1.92 % |
+  | **after the QoS fix** | **3.0445 ± 0.0035 m** | **−0.53 %** |
+
+  The +42.7 mm improvement is 12× the ±3.5 mm method noise, so recovering
+  the dropped frames measurably improved metric accuracy. There is no
+  global scale error. (An earlier note here said −1.33 %; that came from a
+  single bin width and a gravity vector belonging to a different run.)
 - **Bags — which one is good for what:**
   - `~/bags/run_20260801_014240` (67 s, 678 lidar frames, 13,651 IMU) —
     **the first post-reseat bag and the current reference.** `bag_grav.py`
@@ -255,6 +264,13 @@ nominal rather than a mapping fault. Three things say so:
   match. Objective measurement of the jamb faces in the levelled plan
   gives 0.631 m clear, and the widest run with no returns at all is
   0.571 m, both consistent with a 28 in slab in a stopped frame.
+  **Caveat found 2026-08-01:** those gap figures came from the pre-QoS-fix
+  map. On the denser post-fix map the "widest empty run" heuristic breaks
+  down — three click pairs across the same doorway disagree by 651 mm,
+  because returns now land *inside* the opening (door face, jamb reveal)
+  and there is no longer a clean empty span. The heuristic depended on
+  sparsity. Ceiling height remains the trustworthy scale check; settle the
+  doorway with a tape, not with the point cloud.
 
 **Open, low priority: put a tape on that actual doorway.** Until then
 0.813 m is an unverified assumption that has been treated as ground truth
@@ -516,6 +532,12 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    integration silently. Air tires are the cheapest fix; compliance
    between the chassis and the sensor head is the next one — never
    between the IMU and the lidar, which must stay rigid.
+   **Rubber isolator mounts deferred by decision 2026-08-01**: measure the
+   real shock first on an outdoor bag (peak |accel| and its FFT), then size
+   isolators against it. Buying blind risks a mount whose natural frequency
+   sits inside the disturbance band, where isolators amplify rather than
+   damp, and rubber mounts loaded far below their rating stay effectively
+   rigid and do nothing at all.
 7. PTP time sync; revert use_timestamp_type to 0.
 8. Longer outdoor capture with a closed loop to quantify drift.
 9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
