@@ -116,7 +116,14 @@ void setup() {
 
   pinMode(PIN_CS, OUTPUT); digitalWrite(PIN_CS, HIGH);
   pinMode(PIN_INT1, INPUT);
-  pinMode(PIN_PPS, INPUT);
+  // PULLDOWN, not plain INPUT. D4 was floating with a RISING interrupt on
+  // it, which is the whole history of the "PPS flood": with nothing
+  // attached the pin rings on electrical transients (the 2026-08-01
+  // outdoor bag caught 1,809 edges in a 2.6 s burst at ~50 kHz), and with
+  // anything else attached every edge counts as a pulse. The u-blox
+  // TIMEPULSE output idles low and pulses high, so a pull-down is also the
+  // correct termination when the GPS IS connected.
+  pinMode(PIN_PPS, INPUT_PULLDOWN);
 
   SPI.begin();
   SPI.beginTransaction(SPISettings(SPI_HZ, MSBFIRST, SPI_MODE0));

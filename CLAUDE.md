@@ -126,8 +126,17 @@ this file is the handoff. Read it fully before making changes.
     `/gps/pps`. The 2026-08-01 outdoor bag caught 1,809 of them in a 2.6 s
     burst at ~50 kHz, then nothing for 226 s. No GPS emits that. The old
     "~840/s quirk without fix" was never GPS behaviour at all.
-  - **Fix is in XIAO firmware, not wiring**: set D4 to `INPUT_PULLDOWN`,
-    or disable the PPS interrupt while nothing is connected.
+  - **Fixed in firmware 2026-08-01**: `firmware/imu_bridge/src/main.cpp`
+    now sets `PIN_PPS` to `INPUT_PULLDOWN` instead of plain `INPUT`.
+    **Needs flashing to take effect.** The u-blox TIMEPULSE output idles
+    low and pulses high, so a pull-down is the correct termination whether
+    or not the GPS is attached.
+  - **Firmware pin assignments, read from source rather than from this
+    file** (`main.cpp:33-34`, `:115`): `PIN_GPS_RX = D5` at **9600 8N1**,
+    `PIN_PPS = D4`. GPS TX goes to **D5**. Wiring it to D4 instead produces
+    exactly the symptoms seen on 2026-08-01 — `/gps/fix` silent because
+    the UART sees nothing, and `/gps/pps` at ~670 Hz because every NMEA
+    serial edge trips the rising-edge PPS interrupt.
   - **PPS is not needed for next-step 7.** PTP syncs the lidar to the
     laptop over Ethernet; GPS is not involved. PPS only matters if the
     laptop clock is later disciplined to UTC (`gpsd` + `chrony`), which is
