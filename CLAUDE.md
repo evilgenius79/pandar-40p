@@ -16,8 +16,11 @@ this file is the handoff. Read it fully before making changes.
   8 GB, 32 GB RAM, dual-boot Ubuntu 22.04 + ROS 2 Humble. Workspace at
   `~/ros2_ws`. NIC pinned to 192.168.1.100/24.
 - **The project WORKS as of 2026-07-30**: FAST-LIO2 produces a metrically
-  sound multi-room indoor map from a hand-carried pass. Doorway measured
-  0.77 m vs 0.813 m nominal.
+  sound multi-room indoor map from a hand-carried pass. **Scale verified
+  2026-08-01**: floor→ceiling in the map is 3.0200 m against a tape
+  measurement of 3.0607 m (10 ft 0½ in) — **−1.33 % over a 3 m baseline**,
+  measured from histogram peaks of the two horizontal surfaces, not by
+  eye. There is no global scale error.
 - **Bags — which one is good for what:**
   - `~/bags/run_20260801_014240` (67 s, 678 lidar frames, 13,651 IMU) —
     **the first post-reseat bag and the current reference.** `bag_grav.py`
@@ -210,6 +213,33 @@ this file is the handoff. Read it fully before making changes.
   PCDs from save_map.py are XYZ-only ⇒ render white; use Edit → Colors →
   Height Ramp.
 
+## The "doorway error" was probably never an error (2026-08-01)
+
+The long-standing "0.77 m vs 0.813 m nominal" residual looks like a wrong
+nominal rather than a mapping fault. Three things say so:
+
+- **Scale is fine.** Floor→ceiling reads 3.0200 m against 3.0607 m taped
+  (10 ft 0½ in): −1.33 % over 3 m. A map genuinely 12 % small would have
+  put that ceiling at 2.69 m. Errors that are 1.3 % on one baseline and
+  12 % on another are not scale errors — scale is proportional by
+  definition.
+- **Every doorway number so far was measured in a 46.5°-tilted view.**
+  The map is stored in `camera_init`, the IMU's orientation at t=0, and
+  the IMU rides a ~45° mast. CloudCompare's "Top" was not a plan view and
+  Height Ramp shaded along a tilted axis. Picking two jamb faces in that
+  view is unreliable at the 10 % level. Both 0.77 and 0.715 came from it.
+- **0.813 m is a 32-inch door; the measurements say 28-inch.** Matt's
+  0.715 m reading is 28.15 in against a 28 in slab at 0.711 m — a 0.15 in
+  match. Objective measurement of the jamb faces in the levelled plan
+  gives 0.631 m clear, and the widest run with no returns at all is
+  0.571 m, both consistent with a 28 in slab in a stopped frame.
+
+**Open, low priority: put a tape on that actual doorway.** Until then
+0.813 m is an unverified assumption that has been treated as ground truth
+for a week. Use `scripts/diagnostics/floorplan.py` for any future map
+measurement — it levels by the logged gravity vector and finds edges from
+the data instead of from where you click.
+
 ## IMU reseat 2026-07-31 — the old mount was 14° crooked
 
 The IMU was reseated and rewired on the bench. Gravity before and after,
@@ -393,10 +423,11 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    ([-0.057,-0.023,0.047]) and no amount of further bags will change that
    — a deliberate perturbation test would be the only way to probe it, and
    it is not worth doing while translation error stays at the noise level.
-2. **Measure the doorway in `~/map_run_20260801_014240.pcd`** against
-   0.813 m nominal (0.77 m pre-reseat). Tells you whether the 14.4°
-   contributed to the metric error, or whether the residual is elsewhere —
-   in which case the 66% frame drop is the prime suspect.
+2. ~~Measure the doorway.~~ **DONE 2026-08-01 — and it dissolved.** Scale
+   verified against the ceiling to −1.33 % over 3 m; the doorway shortfall
+   is very likely a 28-inch door being compared to a 32-inch nominal. See
+   "The 'doorway error' was probably never an error" above. Residual task
+   is a tape measure on the real doorway, low priority.
 3. **Confirm or kill the frame-drop suspicion** — a reliable-QoS A/B on
    `laserMapping.cpp:927`. It has gone 45% → 48% → 66% across three bags
    and is now the largest known unquantified error source. Any

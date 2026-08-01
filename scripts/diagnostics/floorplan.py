@@ -104,6 +104,34 @@ def rotation_bringing_to_down(g):
     return np.eye(3) + vx + vx @ vx * ((1 - c) / (s * s))
 
 
+def empty_run(pts, p0, p1, corridor=0.06):
+    """Widest gap in the returns along the segment p0->p1.
+
+    Clicking the exact edge of a wall is hopeless: the bands are 7-9 cm
+    thick and the jamb ends are ragged, so the answer moves by centimetres
+    depending on aim. Instead, take a thin corridor along the line the user
+    drew, project the points onto it, and report the widest run with no
+    returns at all. The edges then come from the data.
+    """
+    p0 = np.asarray(p0, float)
+    p1 = np.asarray(p1, float)
+    v = p1 - p0
+    L = np.linalg.norm(v)
+    if L < 1e-6:
+        return None
+    v /= L
+    n = np.array([-v[1], v[0]])
+    rel = pts[:, :2] - p0
+    s = rel @ v
+    t = np.abs(rel @ n)
+    keep = (t <= corridor) & (s >= 0) & (s <= L)
+    s = np.sort(s[keep])
+    if len(s) < 2:
+        return None
+    d = np.diff(s)
+    return float(d.max()) if d.size else None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pcd")
@@ -171,7 +199,14 @@ def main():
     def on_click(ev):
         if ev.inaxes is not ax or ev.xdata is None:
             return
-        if fig.canvas.toolbar.mode:        # zooming/panning, not measuring
+        # Right-click always measures. Left-click measures only when no
+        # toolbar tool is armed -- and the magnifier STAYS armed after you
+        # zoom, which silently ate every measuring click the first time this
+        # was used. Say so instead of doing nothing.
+        mode = getattr(getattr(fig.canvas, "toolbar", None), "mode", "")
+        if ev.button != 3 and mode:
+            print(f"  ({mode} is active -- right-click to measure, or click "
+                  "the toolbar button to disarm it)", flush=True)
             return
         picks.append((ev.xdata, ev.ydata))
         artists.append(ax.plot(ev.xdata, ev.ydata, "o", ms=6,
@@ -179,14 +214,21 @@ def main():
         if len(picks) % 2 == 0:
             (x0, y0), (x1, y1) = picks[-2], picks[-1]
             d = math.hypot(x1 - x0, y1 - y0)
+            gap = empty_run(sel, (x0, y0), (x1, y1))
             artists.append(ax.plot([x0, x1], [y0, y1], "-", lw=1.6,
                                    color="#d1495b")[0])
+            label = f"click {d:.3f} m ({d/0.0254:.1f} in)"
+            if gap is not None:
+                label += f"\ngap {gap:.3f} m ({gap/0.0254:.1f} in)"
             artists.append(ax.annotate(
-                f"{d:.3f} m  ({d/0.0254:.1f} in)",
-                ((x0 + x1) / 2, (y0 + y1) / 2), color="#d1495b",
-                fontsize=11, fontweight="bold",
+                label, ((x0 + x1) / 2, (y0 + y1) / 2), color="#d1495b",
+                fontsize=10, fontweight="bold",
                 bbox=dict(fc="white", ec="#d1495b", alpha=0.85, pad=2)))
-            print(f"  {d:.4f} m = {d/0.0254:.2f} in")
+            print(f"  click-to-click {d:.4f} m = {d/0.0254:.2f} in", flush=True)
+            if gap is not None:
+                print(f"  measured gap   {gap:.4f} m = {gap/0.0254:.2f} in"
+                      "   <- edges found in the data, not by your aim",
+                      flush=True)
         fig.canvas.draw_idle()
 
     def on_key(ev):
