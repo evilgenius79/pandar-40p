@@ -6,7 +6,9 @@
         filter_size_surf: 0.5
         filter_size_map: 0.5
         cube_side_length: 1000.0
-        runtime_pos_log_enable: false
+        runtime_pos_log_enable: true   # logs extrinsic -> Log/mat_out.txt;
+                                       # on while the post-reseat extrinsic
+                                       # is being characterised
 
         common:
             lid_topic: "/lidar_points"
