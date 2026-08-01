@@ -496,8 +496,16 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    (checkerboard) → Koide direct_visual_lidar_calibration. One lens per
    board, ±30–35° splay, 10–15° up-pitch. No hardware trigger found (ELP
    email pending); MJPEG-always rule.
-6. ~~Stroller acquisition + mast-to-stroller build.~~ **DONE** — rig is
-   mounted on a rollator as of the 2026-08-01 photos.
+6. Stroller acquisition + mast-to-stroller build. **PARTIAL** — the
+   2026-08-01 photos show the rig mounted on a wheeled walking frame, so
+   the mast-to-chassis build exists. The target platform is a **jogger
+   stroller specifically for its pneumatic tires**: small hard wheels
+   transmit sharp shock over sidewalk joints, and the accelerometer has
+   only 6.7× headroom to its ±8 g full scale against the 11.74 m/s² peak
+   of an indoor hand-carried pass. Clipping the accel corrupts
+   integration silently. Air tires are the cheapest fix; compliance
+   between the chassis and the sensor head is the next one — never
+   between the IMU and the lidar, which must stay rigid.
 7. PTP time sync; revert use_timestamp_type to 0.
 8. Longer outdoor capture with a closed loop to quantify drift.
 9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
