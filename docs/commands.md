@@ -101,20 +101,82 @@ ros2 bag play ~/bags/run_20260801_014240
 `pcd_save_en` in the config does **not** work — it produces nothing. Use
 `save_map.py`.
 
-## 5. View a map
+## 5. Measure a map
+
+**Use this, not CloudCompare's 3D view.** The map is stored in
+`camera_init`, the IMU's orientation at t=0, and the IMU rides a ~45° mast
+— so every exported map is tilted ~46.5°. CloudCompare's "Top" is not a
+plan view and Height Ramp shades along a tilted axis. Measuring a doorway
+in that view produced a 12% error that took hours to unpick.
+
+```bash
+python3 ~/pandar-40p/scripts/diagnostics/floorplan.py ~/map_run_20260801_014240.pcd
+python3 ~/pandar-40p/scripts/diagnostics/floorplan.py map.pcd --slab 0.3 0.8
+python3 ~/pandar-40p/scripts/diagnostics/floorplan.py map.pcd --no-plot
+```
+
+It levels by the logged gravity vector, writes `<name>_level.pcd`, and
+opens a top-down plan of a horizontal slab.
+
+- **Click two points to measure.** It reports the click-to-click distance
+  *and* the widest run with no returns between them — the second is the
+  one to trust, because it finds the edges in the data instead of relying
+  on your aim. Wall bands are 7–9 cm thick; clicking edges is hopeless.
+- **Right-click always measures.** Left-click only measures when no
+  toolbar tool is armed — and the magnifier stays armed after you zoom,
+  which silently eats left-clicks. It tells you when that happens.
+- `r` clears all measurements.
+
+## 6. View a map in CloudCompare
+
+Open the `_level.pcd` that `floorplan.py` writes, not the raw one, or Top
+and Height Ramp will both be wrong.
 
 ```bash
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
-    /snap/bin/cloudcompare.CloudCompare ~/map_run_20260801_014240.pcd
+    /snap/bin/cloudcompare.CloudCompare ~/map_run_20260801_014240_level.pcd
 ```
 
 The env vars push it onto the NVIDIA card; the snap's Mesa cannot drive the
 iGPU (0xa7a8). It will run without them, in software.
 
-PCDs from `save_map.py` are XYZ-only and render **white** — fix with
-**Edit → Colors → Height Ramp**. GTK theme warnings on startup are noise.
+PCDs are XYZ-only and render **white** — fix with **Edit → Colors → Height
+Ramp**. Switch off perspective projection before measuring. GTK theme
+warnings on startup are noise.
 
-## 6. When ROS goes weird
+## 7. IMU noise characterisation (Allan variance)
+
+**Unplug the lidar first.** Its motor puts a 10 Hz line into the
+accelerometer at 104× the noise floor, and stopping the ROS driver does
+*not* stop it — the unit spins whenever powered.
+
+```bash
+~/pandar-40p/scripts/capture/allan_capture.sh          # start (in tmux)
+~/pandar-40p/scripts/capture/allan_capture.sh status   # progress
+~/pandar-40p/scripts/capture/allan_capture.sh stop     # finish
+```
+
+Runs in tmux session `avar`, so it survives a closed terminal or an SSH
+drop — check it from your phone. Records only `/imu/data_raw`, ~350 MB/h.
+Three hours minimum; overnight is much better, because bias instability
+only appears at long averaging times.
+
+Then:
+
+```bash
+python3 ~/pandar-40p/scripts/diagnostics/allan.py ~/bags/allan_<stamp> --plot ~/allan.png
+python3 ~/pandar-40p/scripts/diagnostics/allan.py ~/bags/allan_<stamp> --max-hours 3
+```
+
+`allan_variance_ros` is **not** usable here — it is a catkin/ROS 1 package
+depending on `rosbag` and `rospy`, with no ROS 2 branch upstream.
+`allan.py` computes the same thing directly from the `.db3`.
+
+Read the caveat it prints before pasting numbers into the config: FAST-LIO's
+defaults sit far above true sensor noise on purpose, and operational noise
+is 2–3× the quiet figures because the lidar is spinning while you map.
+
+## 8. When ROS goes weird
 
 The `ros2` CLI is genuinely unreliable here. In rough order of frequency:
 
@@ -134,7 +196,7 @@ after it never run. Use `scan_peek.py` instead.
 `header.stamp`, so it **cannot** validate timestamp domains. Echo the header
 stamps if that is the question.
 
-## 7. Lidar web console
+## 9. Lidar web console
 
 `http://192.168.1.201` — 600 rpm, return mode, PTP clock source.
 
@@ -144,7 +206,7 @@ unit spinning and streaming with every range `0x0000`. Manual repair failed
 last time; only a factory reset fixed it. Verify via Device Log JSON:
 `laser_enable` all-1, `laser_range` all-`[0,3600]`.
 
-## 8. Git
+## 10. Git
 
 Push straight to `main` — no PRs or side branches unless asked.
 
@@ -152,7 +214,7 @@ Push straight to `main` — no PRs or side branches unless asked.
 cd ~/pandar-40p && git add -A && git commit -m "..." && git push origin main
 ```
 
-## 9. Remote access
+## 11. Remote access
 
 Not project-specific; here because it is used often. Kept out of the repo
 scripts on purpose — the helper lives at `~/.local/bin/claude-session.sh`.
