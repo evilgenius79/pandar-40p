@@ -27,9 +27,12 @@ HOST = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.201"
 BASE = f"http://{HOST}/pandar.cgi?action=get&object="
 
 # pandar.js: Math.pow(2, SpinSpeed - 1) * 300 -- not a linear step
-SPIN = {"1": "300 rpm", "2": "600 rpm", "3": "1200 rpm", "4": "2400 rpm"}
-MODE = {"0": "Last return", "1": "Strongest return", "2": "Dual (last + strongest)"}
-CLOCK = {"0": "internal / free-run", "1": "GPS", "2": "PTP"}
+SPIN = {"1": "300 rpm", "2": "600 rpm", "3": "1200 rpm"}
+MODE = {"0": "Last return", "1": "Strongest return", "2": "Dual return",
+        "3": "First return", "4": "Dual return + pulse info"}
+# setting.html: the select is 0=GPS, 1=PTP. There is no "internal" option --
+# with source GPS and no fix, the sensor clock free-runs from the Y2K epoch.
+CLOCK = {"0": "GPS (free-runs from Y2K with no fix)", "1": "PTP"}
 ONOFF = {"0": "off", "1": "on"}
 
 
