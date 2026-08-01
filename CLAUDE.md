@@ -77,6 +77,11 @@ this file is the handoff. Read it fully before making changes.
   surface point, so partial hits on edges become spurious geometry. Dual
   return earns its keep outdoors seeing past vegetation; indoors it is
   mostly edge noise at double the bandwidth. Not yet A/B tested.
+  Confirmed independently from the console 2026-08-01: `lidar_mode` = 2.
+  (An earlier note here claimed dual return "contributed to the QoS frame
+  drop". That was an assumption, not a measurement, and the probe data
+  argues against it — BEST_EFFORT depth 5 received only 45 of 678 frames,
+  6.6%, so halving the byte rate would not have rescued it.)
   Mounted plug-AFT on a welded mast, tilted forward **~45–47° from
   vertical** — Klein gauge on the mount plate reads ~47°, post-reseat
   gravity puts IMU +Z 44.5° from vertical, and the mast was built to the
@@ -198,10 +203,25 @@ this file is the handoff. Read it fully before making changes.
     covariances rather than substituting honest sensor figures — see the
     caveat `allan.py` prints.
 - **Zero-ranges trap**: NEVER press Save on the web console's Azimuth FOV
-  page. It can persist laser_enable all-0 / zero-width laser_range windows
-  ⇒ spinning+streaming with all ranges 0x0000. Manual repair failed;
-  factory reset fixed it. Verify via Device Log JSON: laser_enable all-1,
-  laser_range all-[0,3600]. NoiseFiltering stays 0.
+  page. It can leave the unit spinning and streaming with all ranges
+  0x0000. Manual repair failed; factory reset fixed it. NoiseFiltering
+  stays 0.
+  - **The old verification criterion here was WRONG and would false-alarm.
+    Corrected 2026-08-01.** It said to check `laser_enable` all-1 and
+    `laser_range` all-[0,3600]. On the healthy unit right now,
+    `laser_enable` is 40 zeros and `laser_range` is 40 × [0,0] — because
+    **`angle_setting_method` is 0**, meaning the global `lidar_range`
+    [0,3600] governs and the per-laser arrays are simply unset. Read
+    `angle_setting_method` first: 0 ⇒ only `lidar_range` matters, 1 ⇒ the
+    per-laser arrays are live. Audit with
+    `scripts/diagnostics/lidar_config.py`, which decodes this correctly.
+  - **Consequence worth chasing: the cause may have been misattributed.**
+    The zero-ranges diagnosis rested partly on seeing `laser_enable`
+    all-0, which we now know is normal. Matt's recollection is that
+    **NoiseFiltering being on was the actual culprit**, cleared by the
+    factory reset. Both stories fit the evidence and neither has been
+    tested. Treat the Azimuth FOV Save button as dangerous anyway, but do
+    not treat its guilt as established.
 - **`ros2` CLI is unreliable on this machine**: stale /dev/shm fastrtps
   lock files (`rm -f /dev/shm/fastrtps_* /dev/shm/sem.fastrtps_*` after
   pkill), daemon dies with `!rclpy.ok()` (`ros2 daemon stop && start`),
