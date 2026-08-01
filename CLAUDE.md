@@ -682,11 +682,20 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    `use_timestamp_type: 0`. Verify by echoing header stamps, not with
    `ros2 bag info`, whose Start/End come from the recorder's wall clock.
    **This machine has NO PTP hardware, every route checked 2026-08-01.**
-   `ethtool -T` reports `PTP Hardware Clock: none` on all of: `enp4s0`
-   (r8169), `wlp3s0` (mt7921e), and **both** USB adapters — MACs
-   `00:e0:4c:68:10:2f` and `80:3f:5d:d0:c6:45`, both USB ID `0bda:8156`,
-   i.e. Realtek RTL8156 2.5 GbE on the `r8152` driver, which does not
-   implement PTP for any part in that family. Do not re-test these. Note
+   `ethtool -T` reports `PTP Hardware Clock: none` on all of:
+
+   | interface | part | speed |
+   |---|---|---|
+   | `enp4s0` | r8169 onboard | 100 Mb/s linked |
+   | `wlp3s0` | mt7921e wifi | — |
+   | `enx00e04c68102f` | USB `0bda:8153` RTL8153 | gigabit |
+   | `enx803f5dd0c645` | USB `0bda:8156` RTL8156 | 2.5 GbE |
+
+   Both USB adapters run the `r8152` driver, which implements no PTP for
+   any part in that family, and both report only `software-receive` —
+   *weaker* than the onboard NIC, which at least offers
+   `software-transmit`. Using either would be a downgrade. Do not re-test
+   these; each was identified individually with the other unplugged. Note
    also that 2.5 GbE buys nothing on the lidar path regardless: the BUELEC
    converter caps it at 100 Mb (`rate=100M`, and `enp4s0` links at exactly
    100 Mb/s), against the lidar's ~37.6 MB/s. So any PTP here is
