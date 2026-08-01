@@ -202,26 +202,29 @@ this file is the handoff. Read it fully before making changes.
     Allan-variance numbers. That argues for keeping FAST-LIO's inflated
     covariances rather than substituting honest sensor figures — see the
     caveat `allan.py` prints.
-- **Zero-ranges trap**: NEVER press Save on the web console's Azimuth FOV
-  page. It can leave the unit spinning and streaming with all ranges
-  0x0000. Manual repair failed; factory reset fixed it. NoiseFiltering
-  stays 0.
-  - **The old verification criterion here was WRONG and would false-alarm.
-    Corrected 2026-08-01.** It said to check `laser_enable` all-1 and
-    `laser_range` all-[0,3600]. On the healthy unit right now,
-    `laser_enable` is 40 zeros and `laser_range` is 40 × [0,0] — because
-    **`angle_setting_method` is 0**, meaning the global `lidar_range`
-    [0,3600] governs and the per-laser arrays are simply unset. Read
-    `angle_setting_method` first: 0 ⇒ only `lidar_range` matters, 1 ⇒ the
-    per-laser arrays are live. Audit with
-    `scripts/diagnostics/lidar_config.py`, which decodes this correctly.
-  - **Consequence worth chasing: the cause may have been misattributed.**
-    The zero-ranges diagnosis rested partly on seeing `laser_enable`
-    all-0, which we now know is normal. Matt's recollection is that
-    **NoiseFiltering being on was the actual culprit**, cleared by the
-    factory reset. Both stories fit the evidence and neither has been
-    tested. Treat the Azimuth FOV Save button as dangerous anyway, but do
-    not treat its guilt as established.
+- **Zero-ranges trap — CAUSE CONFIRMED 2026-08-01: it is
+  `NoiseFiltering = 1`.** Reproduced on demand and fully reversible; the
+  old "manual repair failed, factory reset fixed it" was a
+  misattribution. Measured:
+
+  | state | pts/frame | zero-range | median range |
+  |---|---|---|---|
+  | `NoiseFiltering=0` | 144,000 | 0.1 % | 1.78 m |
+  | **`NoiseFiltering=1`** | 144,400 | **100.0 %** | 0.00 m |
+  | back to `0` | 144,000 | 0.1 % | 1.78 m |
+
+  With the filter on the unit spins, streams a full 144k-point cloud, and
+  puts every point at the origin — nothing errors, which is why it reads
+  as dead hardware. Recovery is one call, no reset needed (note the
+  firmware's spelling, `noise_filtring`):
+
+      curl -s "http://192.168.1.201/pandar.cgi?action=set&object=lidar_data&key=noise_filtring&value=0"
+
+  The **Azimuth FOV page was probably never the culprit** — it inherited
+  the blame because a factory reset cleared `NoiseFiltering` as a side
+  effect. Matt's recollection was right and the docs were wrong. Still no
+  reason to go pressing Save there, but its guilt is retracted.
+  Full console reference: **docs/lidar_console.md**.
 - **`ros2` CLI is unreliable on this machine**: stale /dev/shm fastrtps
   lock files (`rm -f /dev/shm/fastrtps_* /dev/shm/sem.fastrtps_*` after
   pkill), daemon dies with `!rclpy.ok()` (`ros2 daemon stop && start`),

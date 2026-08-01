@@ -26,7 +26,8 @@ import urllib.request
 HOST = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.201"
 BASE = f"http://{HOST}/pandar.cgi?action=get&object="
 
-SPIN = {"1": "300 rpm", "2": "600 rpm", "3": "900 rpm", "4": "1200 rpm"}
+# pandar.js: Math.pow(2, SpinSpeed - 1) * 300 -- not a linear step
+SPIN = {"1": "300 rpm", "2": "600 rpm", "3": "1200 rpm", "4": "2400 rpm"}
 MODE = {"0": "Last return", "1": "Strongest return", "2": "Dual (last + strongest)"}
 CLOCK = {"0": "internal / free-run", "1": "GPS", "2": "PTP"}
 ONOFF = {"0": "off", "1": "on"}

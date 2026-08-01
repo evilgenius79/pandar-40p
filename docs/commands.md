@@ -200,7 +200,22 @@ stamps if that is the question.
 
 `http://192.168.1.201` — 600 rpm, return mode, PTP clock source.
 
-**Never press Save on the Azimuth FOV page.** It can persist
+```bash
+python3 ~/pandar-40p/scripts/diagnostics/lidar_config.py   # read-only audit
+```
+
+**If every range reads zero, it is `NoiseFiltering`, not dead hardware.**
+Confirmed 2026-08-01. One call fixes it, no factory reset (mind the
+firmware's spelling):
+
+```bash
+curl -s "http://192.168.1.201/pandar.cgi?action=set&object=lidar_data&key=noise_filtring&value=0"
+```
+
+Full console reference, including every API object and the ones that erase
+calibration: `docs/lidar_console.md`.
+
+**Historically we were told never to press Save on the Azimuth FOV page.** It can persist
 `laser_enable` all-zero and zero-width `laser_range` windows, leaving the
 unit spinning and streaming with every range `0x0000`. Manual repair failed
 last time; only a factory reset fixed it. Verify via Device Log JSON:
