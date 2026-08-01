@@ -648,17 +648,91 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    integration silently. Air tires are the cheapest fix; compliance
    between the chassis and the sensor head is the next one — never
    between the IMU and the lidar, which must stay rigid.
-   **Rubber isolator mounts deferred by decision 2026-08-01**: measure the
-   real shock first on an outdoor bag (peak |accel| and its FFT), then size
-   isolators against it. Buying blind risks a mount whose natural frequency
-   sits inside the disturbance band, where isolators amplify rather than
-   damp, and rubber mounts loaded far below their rating stay effectively
-   rigid and do nothing at all.
-7. PTP time sync; revert use_timestamp_type to 0.
+   **Rubber isolator mounts: NOT NEEDED, settled by measurement
+   2026-08-01.** The 234 m sidewalk run peaked at 32.59 m/s^2 — 42 % of the
+   ±8 g full scale — with zero samples above even 50 %. Pneumatic tires
+   did the job. Had it been marginal, the rule was: size isolators against
+   a measured shock spectrum, never buy blind, because a mount whose
+   natural frequency sits inside the disturbance band amplifies rather than
+   damps, and rubber loaded far below its rating stays effectively rigid.
+7. PTP time sync; revert `use_timestamp_type` to 0. **Do it in this exact
+   order, and do NOT leave ClockSource on GPS.** The console's clock
+   source select is `0 = GPS, 1 = PTP` and it currently reads **0**. That
+   is harmless today only because `use_timestamp_type: 1` makes the driver
+   use host receive time and ignore the sensor clock entirely. The moment
+   you switch to type 0:
+   - `ClockSource = GPS` **with a fix** puts lidar stamps in GPS/UTC while
+     the IMU stays on host time — a timestamp-domain split, which is
+     blocker (3) from the debugging history all over again, and it will
+     fail silently.
+   - `ClockSource = GPS` **without** a fix free-runs from the Y2K epoch,
+     which is the same trap from the other direction.
+   So: set `ClockSource` → **PTP (1)**, run `ptp4l` as master on the
+   laptop, confirm `PTPStatus` leaves "Free Run", *then* set
+   `use_timestamp_type: 0`. Verify by echoing header stamps, not with
+   `ros2 bag info`, whose Start/End come from the recorder's wall clock.
+   **Timebox this** — host-receive jitter is roughly 1 ms, about 1 mm at
+   walking pace, against 1.28 m of measured drift. It is correctness, not
+   accuracy.
 8. Longer outdoor capture with a closed loop to quantify drift.
 9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
    dynamic removal → colorize → PINGS/Gaussian-LIC2 splats. 8 GB VRAM ⇒
    chunk scenes. Tier 2 later: ZED-F9P RTK via Indiana InCORS NTRIP (free).
+
+## Decisions taken 2026-08-01 that are not visible in the code
+
+Recorded because they are cheap to re-litigate and the reasoning is not
+obvious from any config file.
+
+- **Spin rate stays 600 rpm.** 1200 rpm does not add data — the firing
+  rate is fixed, so it halves azimuth resolution (0.2° → 0.4°) to double
+  the frame rate. FAST-LIO2 already deskews with per-point timestamps, so
+  the usual motion-blur argument for 20 Hz does not apply at walking pace,
+  where a 100 ms scan sweeps ~14 cm. 1200 rpm earns its keep at vehicle
+  speeds, not on a stroller.
+- **Dual return stays on.** Matt's call, for outdoor work. Confirmed
+  worthwhile by the 2026-08-01 map, where tree canopy shows internal
+  structure rather than a solid shell — second returns punching through
+  foliage. Indoors it is mostly edge noise at double the bandwidth.
+- **Bags stay on the root NVMe; the second M.2 is not used.** Recording
+  demands 37.6 MB/s against a drive doing 1000+, and the recorder captures
+  678 frames in 67.7 s = 10.02 Hz, i.e. **100 %** of what the sensor
+  emits. Disk was never a bottleneck — the losses were all QoS. Capacity
+  is the only real argument: 37.6 MB/s is **135 GB/hour**, so ~6.4 hours
+  of continuous recording fits in the free space. The second drive is a
+  single 954 GB NTFS partition labelled "Storage", unmounted, contents
+  unknown; NTFS via ntfs-3g is FUSE-based and poor for sustained writes,
+  so it would want reformatting before use.
+- **Battery monitoring, parts ordered, not yet built.** INA226 (0–36 V,
+  I2C, 2 mΩ shunt) plus a Waveshare ESP32-C6 with a 1.47" display, to
+  watch the 12 V deep-cycle that powers the rig. Design notes: the INA226
+  runs at 3.3 V so it wires straight to the ESP32 with no level shifting;
+  its 0–36 V common-mode range means **high-side** sensing works, which
+  keeps one common ground across laptop, lidar and converter. **Fuse at
+  the battery terminal** — a deep cycle will push hundreds of amps into a
+  short and this is new wiring on a moving cart. Thresholds depend on
+  chemistry (12.0 V is ~50 % on flooded lead-acid but near-full on
+  LiFePO4), so establish that first. The payoff worth building for: publish
+  it as a ROS topic and record it in the bag, so a bad run can be checked
+  against a voltage trace instead of guessed at. Watch for a pin clash —
+  the XIAO's GPS sits on D5/D4, which are the ESP32-S3's default I2C pins;
+  remapping to D2/D3 should work but needs checking against the schematic.
+- **A display on the XIAO would be for stillness and clipping, not tilt.**
+  Starting attitude does not need to be consistent — the levelling rotation
+  is derived per-run from logged gravity. The readouts actually worth
+  having are live |gyro| (so the 3–5 s dead-still init is verified rather
+  than counted) and live peak |accel| against the ±8 g limit, since
+  clipping is silent. An I2C display needs 2 pins; the round display wants
+  SPI plus CS/DC/backlight and would not fit alongside the IMU and GPS.
+- **Lidar stays primary for pose; cameras become primary for the model.**
+  Matt raised whether cameras should lead instead. For *trajectory*, lidar
+  ranges directly while stereo error grows with the square of distance,
+  and blank drywall and direct sun defeat feature matching — trajectory
+  error poisons everything downstream, so that half stays lidar-inertial.
+  For the *deliverable*, cameras carry appearance and fine geometry and
+  lidar supplies scale and drift control. That is exactly what
+  Gaussian-LIC2 and PINGS already do, both of which are on the offline
+  chain in next-step 9. The roadmap is not "lidar map, then paint it".
 
 ## Where the raw evidence lives
 
