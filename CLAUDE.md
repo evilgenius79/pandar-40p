@@ -651,6 +651,33 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    dynamic removal → colorize → PINGS/Gaussian-LIC2 splats. 8 GB VRAM ⇒
    chunk scenes. Tier 2 later: ZED-F9P RTK via Indiana InCORS NTRIP (free).
 
+## Where the raw evidence lives
+
+Claims in this file are traceable to data still on disk. If a number here
+looks wrong, re-derive it rather than trusting the prose.
+
+- **Bags** — `~/bags/`, listed at the top of this file. 13.5 GB total,
+  862 GB free, no pressure to prune.
+- **Maps** — `~/map_run_<stamp>.pcd` and `_level.pcd`. Also
+  `map_run_20260801_014240_PREQOS.pcd`, deliberately kept: it is the same
+  bag mapped through the old dropping QoS, and is what the −1.92 % vs
+  −0.53 % scale comparison rests on.
+- **Extrinsic logs** — `~/ros2_ws/src/FAST_LIO/Log/`:
+  `mat_out.txt` is transient and gets overwritten by every replay, so the
+  ones that back specific claims are kept under names:
+  `mat_out_20260730bag_crooked.txt` (the 14° crooked-mount forensic run),
+  `mat_20260801outdoor_eston.txt` and `mat_20260801outdoor_estoff.txt`
+  (the `extrinsic_est_en` A/B).
+- **Re-deriving anything** — `scripts/diagnostics/` covers it:
+  `bag_grav.py` mount signature, `analyze_ext.py` extrinsic,
+  `allan.py` IMU noise, `floorplan.py` levelling and map measurement,
+  `lidar_config.py` console settings, `run_test.sh` the whole replay.
+
+**Replay is not deterministic.** Three replays of the same bag gave 2508 /
+2511 / 2485 processed scans and loop-closure gaps spanning 65 mm. Any A/B
+resting on a difference smaller than about 100 mm of loop closure needs
+repeats before it means anything.
+
 ## Working style with Matt
 
 - Verify against primary sources before asserting; prefer measurements over
