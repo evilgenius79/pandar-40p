@@ -141,6 +141,11 @@ this file is the handoff. Read it fully before making changes.
     `pio run` builds (~48 s), `pio run -t upload` flashes (~12 s, auto-resets
     via RTS, no BOOT button needed). **Stop the bridge first** — it holds
     `/dev/ttyACM0` open and the upload will fail otherwise.
+  - **PlatformIO needs `python3.10-venv`** (`sudo apt install -y
+    python3.10-venv`). Without it, any operation that makes PlatformIO
+    rebuild its virtualenv fails with *"ensurepip is not available"*.
+    Installing `virtualenv` via pip does **not** help — this PlatformIO
+    version calls `python3 -m venv` directly with no fallback.
   - **Firmware pin assignments, read from source rather than from this
     file** (`main.cpp:33-34`, `:115`): `PIN_GPS_RX = D5` at **9600 8N1**,
     `PIN_PPS = D4`. GPS TX goes to **D5**.
