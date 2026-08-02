@@ -31,6 +31,8 @@ BAG_DIR = os.path.expanduser("~/bags")
 BRIDGE_PORT = "/dev/ttyACM0"
 LIDAR_TEMP = os.path.expanduser(
     "~/pandar-40p/ros2/lidar_temp_node/lidar_temp_node.py")
+RIG_STATUS = os.path.expanduser(
+    "~/pandar-40p/ros2/rig_status_node/rig_status_node.py")
 RECORD_TOPICS = ["/lidar_points", "/imu/data_raw", "/gps/fix", "/gps/pps",
                  "/imu/temperature", "/lidar/temperature"]
 
@@ -52,6 +54,13 @@ def generate_launch_description():
         cmd=["python3", LIDAR_TEMP],
         name="lidar_temp", output="log")
 
+    # Status JSON on :8080. Read-only, BEST_EFFORT subscriptions only, so it
+    # cannot add back-pressure to the pipeline it observes. Reachable over
+    # Tailscale, so rig state is checkable from a phone mid-run.
+    rig_status = ExecuteProcess(
+        cmd=["python3", RIG_STATUS],
+        name="rig_status", output="log")
+
     bag_path = os.path.join(BAG_DIR,
                             datetime.now().strftime("run_%Y%m%d_%H%M%S"))
     record = ExecuteProcess(
@@ -59,4 +68,5 @@ def generate_launch_description():
         name="bag_record", output="screen",
         condition=IfCondition(LaunchConfiguration("record")))
 
-    return LaunchDescription([record_arg, lidar, bridge, lidar_temp, record])
+    return LaunchDescription(
+        [record_arg, lidar, bridge, lidar_temp, rig_status, record])
