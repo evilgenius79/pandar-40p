@@ -9,18 +9,19 @@
 //     MOSI GPIO6   SCLK GPIO7   CS GPIO14   DC GPIO15   RST GPIO21   BL GPIO22
 //     RGB LED GPIO8        SD card: CS GPIO4, MISO GPIO5 (unused here)
 //
-// The I2C pins below are NOT from the documentation — Waveshare say only that
-// "most GPIOs are broken out" without naming them. 18/19 avoid every assigned
-// pin above and avoid GPIO12/13, which are the C6's native USB lines. VERIFY
-// AGAINST THE HEADER SILKSCREEN before wiring. If they are wrong the display
-// will say so at boot rather than silently reading nothing: an I2C scan runs at
-// startup and the result is shown on screen.
+// I2C on GP18/GP19 — CONFIRMED against the board's own pinout diagram, which
+// breaks out GP0-GP5 and GP9/12/13/18/19/20/23 on the headers and marks
+// GP18 and GP19 as I2C-capable. 3V3(OUT) and GND sit on the left header.
+// An I2C scan still runs at boot and reports on screen, so a wiring fault
+// shows as a clear message rather than plausible-looking zeroes.
 //
 // WIRING the INA226, and the one that matters:
-//     INA226 VCC -> 3V3        (the part runs 2.7-5.5 V; 3.3 V needs no shifter)
-//     INA226 GND -> GND        (must be common with the battery negative)
-//     INA226 SDA -> PIN_SDA
-//     INA226 SCL -> PIN_SCL
+//     INA226 VCC -> 3V3(OUT)   left header, 3rd pin down. The part runs
+//                              2.7-5.5 V, so 3.3 V needs no level shifter.
+//     INA226 GND -> GND        left header, 2nd pin down. Must be common with
+//                              the battery negative.
+//     INA226 SDA -> GP18       right header
+//     INA226 SCL -> GP19       right header
 //     IN+ / IN-  -> across the shunt, in the battery POSITIVE lead (high side).
 //                   The INA226's 0-36 V common-mode range is what allows this,
 //                   and high-side keeps one common ground across laptop, lidar
@@ -47,8 +48,8 @@ static const int PIN_DC   = 15;
 static const int PIN_RST  = 21;
 static const int PIN_BL   = 22;
 
-static const int PIN_SDA  = 18;   // <-- verify against the header silkscreen
-static const int PIN_SCL  = 19;   // <-- verify against the header silkscreen
+static const int PIN_SDA  = 18;   // right header, I2C-capable per pinout
+static const int PIN_SCL  = 19;   // right header, I2C-capable per pinout
 
 // ---------- INA226 ----------
 static const uint8_t INA226_ADDR   = 0x40;   // A0/A1 both to GND
