@@ -821,9 +821,17 @@ obvious from any config file.
   single 954 GB NTFS partition labelled "Storage", unmounted, contents
   unknown; NTFS via ntfs-3g is FUSE-based and poor for sustained writes,
   so it would want reformatting before use.
-- **Battery monitoring, parts ordered, not yet built.** INA226 (0–36 V,
-  I2C, 2 mΩ shunt) plus a Waveshare ESP32-C6 with a 1.47" display, to
-  watch the 12 V deep-cycle that powers the rig. Design notes: the INA226
+- **Battery monitoring — firmware written 2026-08-01, not yet flashed.**
+  `firmware/battery_monitor/`. INA226 (0–36 V, I2C, 2 mΩ shunt) plus a
+  Waveshare ESP32-C6-LCD-1.47, watching the **flooded lead-acid deep-cycle**
+  pack. Wiring, confirmed against the board pinout diagram: INA226 VCC →
+  3V3(OUT) and GND → GND on the left header, SDA → GP18 and SCL → GP19 on
+  the right header, shunt high-side in the battery positive lead.
+  Thresholds are the deep-cycle ones that protect cycle life: amber at
+  **12.2 V = 50 % depth of discharge**, red at 12.0 V — not the 11.8 V
+  "flat" figure, since habitually going past 50 % is what kills these
+  packs. All resting voltages; the display flags when current is flowing,
+  because a loaded pack sags and reads low. Design notes: the INA226
   runs at 3.3 V so it wires straight to the ESP32 with no level shifting;
   its 0–36 V common-mode range means **high-side** sensing works, which
   keeps one common ground across laptop, lidar and converter. **Fuse at

@@ -68,13 +68,24 @@ static const float SHUNT_LSB_V  = 2.5e-6f;   // datasheet
 // of jittering on every motor transient.
 static const uint16_t CONFIG_VALUE = 0x4727;
 
-// ---------- battery thresholds ----------
-// DEFAULTS ARE FOR FLOODED LEAD-ACID AT REST. They are wrong for LiFePO4,
-// whose curve is far flatter -- 12.0 V is roughly 50 % on lead-acid but still
-// near-full on LiFePO4. Set the chemistry before trusting the colours.
-static const float V_FULL = 12.7f;
-static const float V_HALF = 12.0f;
-static const float V_LOW  = 11.8f;
+// ---------- battery thresholds: LEAD-ACID DEEP CYCLE ----------
+// Confirmed chemistry 2026-08-01. Rested open-circuit voltages:
+//     12.7 = 100 %   12.5 = 75 %   12.2 = 50 %   12.0 = 25 %   11.8 = flat
+//
+// The line that matters is 12.2 V, not 11.8. A deep-cycle pack taken
+// repeatedly below 50 % depth of discharge loses cycle life fast, so the
+// display goes amber there rather than waiting for the battery to be nearly
+// empty. Red at 12.0 means stop now.
+//
+// THESE ARE RESTING VOLTAGES. Under load the pack sags, so a reading taken
+// while the rig is drawing current understates the true state of charge --
+// the display flags when that is happening rather than letting you misread a
+// sag as a flat battery.
+static const float V_FULL  = 12.7f;   // 100 %, rested
+static const float V_GOOD  = 12.45f;  // ~65 %
+static const float V_HALF  = 12.2f;   // 50 % -- do not habitually go below
+static const float V_LOW   = 12.0f;   // 25 % -- stop
+static const float V_EMPTY = 11.8f;   // bar floor
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_DC, PIN_CS, PIN_SCLK, PIN_MOSI);
 Arduino_GFX *gfx = new Arduino_ST7789(bus, PIN_RST, 0 /*rotation*/,
@@ -173,7 +184,8 @@ void loop() {
   ahUsed += amps * dtH;
   whUsed += watts * dtH;
 
-  uint16_t col = volts >= V_FULL ? GREEN : (volts >= V_HALF ? YELLOW
+  bool loaded = fabsf(amps) > 0.5f;
+  uint16_t col = volts >= V_GOOD ? GREEN : (volts >= V_HALF ? YELLOW
                 : (volts >= V_LOW ? ORANGE : RED));
 
   gfx->fillScreen(BLACK);
@@ -200,14 +212,21 @@ void loop() {
   gfx->printf("      %.1f Wh", whUsed);
 
   // A bar is easier to read at a glance than a number while walking.
-  int barW = (int)(((volts - V_LOW) / (V_FULL - V_LOW)) * 156.0f);
+  int barW = (int)(((volts - V_EMPTY) / (V_FULL - V_EMPTY)) * 156.0f);
   barW = constrain(barW, 0, 156);
   gfx->drawRect(8, 176, 156, 14, WHITE);
   if (barW > 0) gfx->fillRect(9, 177, barW, 12, col);
 
-  gfx->setTextColor(DARKGREY);
+  // Mark the 50 % line on the bar -- the number that protects cycle life.
+  int halfX = 9 + (int)(((V_HALF - V_EMPTY) / (V_FULL - V_EMPTY)) * 156.0f);
+  gfx->drawFastVLine(halfX, 174, 18, WHITE);
+
+  gfx->setTextColor(loaded ? ORANGE : DARKGREY);
   gfx->setCursor(8, 200);
-  gfx->print("lead-acid scale");
+  gfx->print(loaded ? "UNDER LOAD - reads low" : "rested  | mark = 50%");
+  gfx->setTextColor(DARKGREY);
+  gfx->setCursor(8, 214);
+  gfx->print("lead-acid deep cycle");
 
   Serial.printf("%.3f V  %+.3f A  %+.2f W  %.4f Ah\n", volts, amps, watts, ahUsed);
   delay(500);
