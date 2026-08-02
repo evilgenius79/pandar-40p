@@ -72,16 +72,27 @@ class RigStatus(Node):
                                  self.on_lidar, sensor_qos)
         self.create_subscription(NavSatFix, "/gps/fix", self.on_gps, 10)
         self.create_subscription(Temperature, "/imu/temperature",
-                                 lambda m: self.put("imu_temp_c",
-                                                    round(m.temperature, 2)), 10)
+                                 lambda m: self.temp("imu", m.temperature), 10)
         self.create_subscription(Temperature, "/lidar/temperature",
-                                 lambda m: self.put("lidar_temp_c",
-                                                    round(m.temperature, 2)), 10)
+                                 lambda m: self.temp("lidar", m.temperature), 10)
         self.create_timer(1.0, self.tick)
 
     def put(self, k, v):
         with LOCK:
             STATE[k] = v
+
+    def temp(self, which, c):
+        """Publish both scales.
+
+        The ROS topics themselves stay in CELSIUS and must -- sensor_msgs/
+        Temperature is defined as degrees Celsius, so changing what is
+        published would silently break the message contract for anything
+        downstream. Fahrenheit belongs in the human-facing layer, which is
+        this one.
+        """
+        with LOCK:
+            STATE[f"{which}_temp_f"] = round(c * 9.0 / 5.0 + 32.0, 1)
+            STATE[f"{which}_temp_c"] = round(c, 2)
 
     def on_imu(self, m):
         self.r_imu.tick()

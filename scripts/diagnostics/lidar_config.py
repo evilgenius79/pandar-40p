@@ -127,7 +127,12 @@ else:
         return f"{v//60} h {v%60:02d} min"
 
     show("start-ups", ts.get("StartupTimes"))
-    show("internal temp", ts.get("CurrentTemp", "?") + " C")
+    _c = ts.get("CurrentTemp")
+    try:
+        _f = f"{float(_c) * 9.0 / 5.0 + 32.0:.1f} F  ({float(_c):.2f} C)"
+    except (TypeError, ValueError):
+        _f = f"{_c} ?"
+    show("internal temp", _f)
     show("total operation", f"{ts.get('TotalWorkingTime')} min",
          note=f"  = {hm(ts.get('TotalWorkingTime', 0))}")
     show("uptime this boot", f"{ts.get('SystemUptime')} min",
