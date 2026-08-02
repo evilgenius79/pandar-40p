@@ -114,7 +114,7 @@ static bool writeReg(uint8_t reg, uint16_t val) {
 }
 
 static void banner(const char *l1, const char *l2, uint16_t col) {
-  gfx->fillScreen(BLACK);
+  gfx->fillScreen(RGB565_BLACK);
   gfx->setTextColor(col);
   gfx->setTextSize(2);
   gfx->setCursor(6, 40);
@@ -130,7 +130,7 @@ void setup() {
   pinMode(PIN_BL, OUTPUT);
   digitalWrite(PIN_BL, HIGH);
   gfx->begin();
-  gfx->fillScreen(BLACK);
+  gfx->fillScreen(RGB565_BLACK);
 
   Wire.begin(PIN_SDA, PIN_SCL, 400000);
 
@@ -149,19 +149,19 @@ void setup() {
     }
     banner("NO INA226", found.length()
              ? ("found: " + found + "\n\ncheck address").c_str()
-             : "nothing on the bus\n\ncheck SDA/SCL pins,\npower and ground", RED);
+             : "nothing on the bus\n\ncheck SDA/SCL pins,\npower and ground", RGB565_RED);
     return;
   }
 
   writeReg(REG_CONFIG, CONFIG_VALUE);
   lastMs = millis();
 
-  gfx->setTextColor(WHITE);
+  gfx->setTextColor(RGB565_WHITE);
   gfx->setTextSize(1);
   gfx->setCursor(6, 6);
   gfx->printf("INA226 ok  %04X/%04X", manuf, die);
   delay(800);
-  gfx->fillScreen(BLACK);
+  gfx->fillScreen(RGB565_BLACK);
 }
 
 void loop() {
@@ -169,7 +169,7 @@ void loop() {
 
   uint16_t rawBus = 0, rawShunt = 0;
   if (!readReg(REG_BUS_V, rawBus) || !readReg(REG_SHUNT_V, rawShunt)) {
-    banner("I2C LOST", "INA226 stopped responding", RED);
+    banner("I2C LOST", "INA226 stopped responding", RGB565_RED);
     delay(1000);
     return;
   }
@@ -185,10 +185,10 @@ void loop() {
   whUsed += watts * dtH;
 
   bool loaded = fabsf(amps) > 0.5f;
-  uint16_t col = volts >= V_GOOD ? GREEN : (volts >= V_HALF ? YELLOW
-                : (volts >= V_LOW ? ORANGE : RED));
+  uint16_t col = volts >= V_GOOD ? RGB565_GREEN : (volts >= V_HALF ? RGB565_YELLOW
+                : (volts >= V_LOW ? RGB565_ORANGE : RGB565_RED));
 
-  gfx->fillScreen(BLACK);
+  gfx->fillScreen(RGB565_BLACK);
 
   gfx->setTextColor(col);
   gfx->setTextSize(4);
@@ -197,7 +197,7 @@ void loop() {
   gfx->setTextSize(2);
   gfx->print("V");
 
-  gfx->setTextColor(WHITE);
+  gfx->setTextColor(RGB565_WHITE);
   gfx->setTextSize(2);
   gfx->setCursor(8, 78);
   gfx->printf("%+.2f A", amps);
@@ -205,7 +205,7 @@ void loop() {
   gfx->printf("%+.1f W", watts);
 
   gfx->setTextSize(1);
-  gfx->setTextColor(CYAN);
+  gfx->setTextColor(RGB565_CYAN);
   gfx->setCursor(8, 140);
   gfx->printf("used  %.3f Ah", ahUsed);
   gfx->setCursor(8, 154);
@@ -214,17 +214,17 @@ void loop() {
   // A bar is easier to read at a glance than a number while walking.
   int barW = (int)(((volts - V_EMPTY) / (V_FULL - V_EMPTY)) * 156.0f);
   barW = constrain(barW, 0, 156);
-  gfx->drawRect(8, 176, 156, 14, WHITE);
+  gfx->drawRect(8, 176, 156, 14, RGB565_WHITE);
   if (barW > 0) gfx->fillRect(9, 177, barW, 12, col);
 
   // Mark the 50 % line on the bar -- the number that protects cycle life.
   int halfX = 9 + (int)(((V_HALF - V_EMPTY) / (V_FULL - V_EMPTY)) * 156.0f);
-  gfx->drawFastVLine(halfX, 174, 18, WHITE);
+  gfx->drawFastVLine(halfX, 174, 18, RGB565_WHITE);
 
-  gfx->setTextColor(loaded ? ORANGE : DARKGREY);
+  gfx->setTextColor(loaded ? RGB565_ORANGE : RGB565_DARKGREY);
   gfx->setCursor(8, 200);
   gfx->print(loaded ? "UNDER LOAD - reads low" : "rested  | mark = 50%");
-  gfx->setTextColor(DARKGREY);
+  gfx->setTextColor(RGB565_DARKGREY);
   gfx->setCursor(8, 214);
   gfx->print("lead-acid deep cycle");
 

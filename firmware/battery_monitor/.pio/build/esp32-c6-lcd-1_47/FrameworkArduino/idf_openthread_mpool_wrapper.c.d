@@ -1,0 +1,31 @@
+.pio/build/esp32-c6-lcd-1_47/FrameworkArduino/idf_openthread_mpool_wrapper.c.o: \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32/cores/esp32/idf_openthread_mpool_wrapper.c \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/soc/esp32c6/include/soc/soc_caps.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/qio_qspi/include/sdkconfig.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/newlib/platform_include/assert.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/heap/include/esp_heap_caps.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/heap/include/multi_heap.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_common/include/esp_err.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/newlib/platform_include/stdio.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_common/include/esp_compiler.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_common/include/esp_attr.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_rom/include/esp_rom_sys.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/soc/esp32c6/include/soc/reset_reasons.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_config.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_level.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_common/include/esp_assert.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_color.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_buffer.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_timestamp.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_write.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_format.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_args.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_common/include/esp_macros.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/esp_common/include/esp_assert.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_log_attr.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/log/include/esp_private/log_attr.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/openthread/openthread/include/openthread/instance.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/openthread/openthread/include/openthread/error.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/openthread/openthread/include/openthread/platform/toolchain.h \
+ /home/lidar/.platformio/packages/framework-arduinoespressif32-libs/esp32c6/include/openthread/openthread/include/openthread/platform/messagepool.h
