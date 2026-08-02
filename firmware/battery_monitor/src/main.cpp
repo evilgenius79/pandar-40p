@@ -140,6 +140,17 @@ static bool writeReg(uint8_t reg, uint16_t val) {
   return Wire.endTransmission() == 0;
 }
 
+// Every screen carries the build stamp. Without it, a board showing the same
+// "NO INA226" message before and after a reflash gives no way to tell which
+// firmware is actually running -- which cost a round of head-scratching on
+// 2026-08-01.
+static void stamp() {
+  gfx->setTextColor(RGB565_DARKGREY);
+  gfx->setTextSize(1);
+  gfx->setCursor(4, 300);
+  gfx->printf("build %s %s", __DATE__, __TIME__);
+}
+
 static void banner(const char *l1, const char *l2, uint16_t col) {
   gfx->fillScreen(RGB565_BLACK);
   gfx->setTextColor(col);
@@ -149,6 +160,7 @@ static void banner(const char *l1, const char *l2, uint16_t col) {
   gfx->setTextSize(1);
   gfx->setCursor(6, 80);
   gfx->println(l2);
+  stamp();
 }
 
 void setup() {
@@ -281,6 +293,7 @@ void loop() {
   gfx->setTextColor(RGB565_DARKGREY);
   gfx->setCursor(8, 214);
   gfx->print("lead-acid deep cycle");
+  stamp();
 
   Serial.printf("%.3f V  %+.3f A  %+.2f W  %.4f Ah\n", volts, amps, watts, ahUsed);
   delay(500);
