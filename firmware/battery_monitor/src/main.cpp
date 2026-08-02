@@ -22,6 +22,10 @@
 //                              the battery negative.
 //     INA226 SDA -> GP18       right header
 //     INA226 SCL -> GP19       right header
+//     INA226 ALERT -> GP20     right header. Open-drain, so it relies on the
+//                              C6's internal pull-up; asserts LOW below
+//                              V_ALERT. Hardware-driven, so it still fires if
+//                              this firmware hangs.
 //     IN+ / IN-  -> across the shunt, in the battery POSITIVE lead (high side).
 //                   The INA226's 0-36 V common-mode range is what allows this,
 //                   and high-side keeps one common ground across laptop, lidar
@@ -48,14 +52,18 @@ static const int PIN_DC   = 15;
 static const int PIN_RST  = 21;
 static const int PIN_BL   = 22;
 
-static const int PIN_SDA  = 18;   // right header, I2C-capable per pinout
-static const int PIN_SCL  = 19;   // right header, I2C-capable per pinout
+static const int PIN_SDA   = 18;  // right header, I2C-capable per pinout
+static const int PIN_SCL   = 19;  // right header, I2C-capable per pinout
+static const int PIN_ALERT = 20;  // right header; INA226 ALERT, open-drain
+static const int PIN_RGB   = 8;   // on-board RGB LED
 
 // ---------- INA226 ----------
 static const uint8_t INA226_ADDR   = 0x40;   // A0/A1 both to GND
 static const uint8_t REG_CONFIG    = 0x00;
 static const uint8_t REG_SHUNT_V   = 0x01;
 static const uint8_t REG_BUS_V     = 0x02;
+static const uint8_t REG_MASK_EN   = 0x06;
+static const uint8_t REG_ALERT_LIM = 0x07;
 static const uint8_t REG_MANUF_ID  = 0xFE;   // expect 0x5449 ("TI")
 static const uint8_t REG_DIE_ID    = 0xFF;   // expect 0x2260
 
@@ -86,6 +94,25 @@ static const float V_GOOD  = 12.45f;  // ~65 %
 static const float V_HALF  = 12.2f;   // 50 % -- do not habitually go below
 static const float V_LOW   = 12.0f;   // 25 % -- stop
 static const float V_EMPTY = 11.8f;   // bar floor
+
+// ---------- ALERT ----------
+// The INA226 raises ALERT in hardware, independent of this firmware, so a
+// crashed sketch cannot swallow a low-battery warning. Wired to the RGB LED
+// because the point is to be noticed while pushing the stroller and NOT
+// looking at the screen.
+//
+// Threshold is deliberately below the 12.2 V / 50 % line. Under load a pack
+// sags -- roughly 0.1 V at a few amps through typical internal resistance --
+// so alerting at 12.2 while the rig is drawing current would cry wolf
+// constantly. 12.0 V loaded corresponds to roughly 12.1 V rested.
+static const float V_ALERT = 12.0f;
+
+// Mask/Enable register bits. TRANSCRIBED FROM THE DATASHEET AND NOT YET
+// CONFIRMED AGAINST A COPY IN HAND -- verify before trusting the alarm, the
+// same rule applied to the LSB constants above.
+//   bit 12 BUL  Bus Under-Voltage
+//   bit  0 LEN  latch, so a brief dip stays asserted until read
+static const uint16_t MASK_BUS_UNDER_LATCHED = (1u << 12) | (1u << 0);
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_DC, PIN_CS, PIN_SCLK, PIN_MOSI);
 Arduino_GFX *gfx = new Arduino_ST7789(bus, PIN_RST, 0 /*rotation*/,
@@ -154,6 +181,12 @@ void setup() {
   }
 
   writeReg(REG_CONFIG, CONFIG_VALUE);
+
+  // Alert limit for a bus-voltage comparison is expressed in bus LSBs.
+  writeReg(REG_ALERT_LIM, (uint16_t)(V_ALERT / BUS_LSB_V));
+  writeReg(REG_MASK_EN, MASK_BUS_UNDER_LATCHED);
+  pinMode(PIN_ALERT, INPUT_PULLUP);   // open-drain, asserts LOW
+
   lastMs = millis();
 
   gfx->setTextColor(RGB565_WHITE);
@@ -185,10 +218,31 @@ void loop() {
   whUsed += watts * dtH;
 
   bool loaded = fabsf(amps) > 0.5f;
+  bool alert  = (digitalRead(PIN_ALERT) == LOW);
+  if (alert) {
+    uint16_t clear;
+    readReg(REG_MASK_EN, clear);   // reading clears the latched flag
+  }
   uint16_t col = volts >= V_GOOD ? RGB565_GREEN : (volts >= V_HALF ? RGB565_YELLOW
                 : (volts >= V_LOW ? RGB565_ORANGE : RGB565_RED));
 
-  gfx->fillScreen(RGB565_BLACK);
+  // Flash the whole screen and the RGB LED on alert. The LED is the part
+  // that matters -- it is visible peripherally, the screen is not.
+  if (alert) {
+    static bool phase = false;
+    phase = !phase;
+    gfx->fillScreen(phase ? RGB565_RED : RGB565_BLACK);
+    rgbLedWrite(PIN_RGB, phase ? 64 : 0, 0, 0);
+    gfx->setTextColor(RGB565_WHITE);
+    gfx->setTextSize(3);
+    gfx->setCursor(10, 130);
+    gfx->print("LOW");
+    gfx->setCursor(10, 160);
+    gfx->print("BATT");
+  } else {
+    rgbLedWrite(PIN_RGB, 0, 0, 0);
+    gfx->fillScreen(RGB565_BLACK);
+  }
 
   gfx->setTextColor(col);
   gfx->setTextSize(4);
