@@ -295,6 +295,11 @@ this file is the handoff. Read it fully before making changes.
 - **Replay/export/analyse is one command**:
   `scripts/diagnostics/run_test.sh [bag] [voxel]` — preflight, mount
   signature, mapper, PCD export, extrinsic analysis, frame-drop count.
+- **Extra ROS nodes added 2026-08-01**, both launched by
+  `rig.launch.py`: `ros2/lidar_temp_node/` polls the lidar console for its
+  die temperature, and `ros2/rig_status_node/` serves all rig state as JSON
+  on :8080. Both are read-only and use BEST_EFFORT subscriptions so they
+  cannot add back-pressure to the mapping pipeline.
 - **`docs/commands.md` is the command cheatsheet** — record, replay,
   diagnostics, CloudCompare, DDS unwedging, web-console warnings.
 
@@ -463,11 +468,12 @@ power-ups — more support for turn-on bias rather than a moving mount.
 The long-standing "0.77 m vs 0.813 m nominal" residual looks like a wrong
 nominal rather than a mapping fault. Three things say so:
 
-- **Scale is fine.** Floor→ceiling reads 3.0200 m against 3.0607 m taped
-  (10 ft 0½ in): −1.33 % over 3 m. A map genuinely 12 % small would have
-  put that ceiling at 2.69 m. Errors that are 1.3 % on one baseline and
-  12 % on another are not scale errors — scale is proportional by
-  definition.
+- **Scale is fine.** Floor→ceiling reads 3.0445 ± 0.0035 m against
+  3.0607 m taped (10 ft 0½ in): **−0.53 % over 3 m** on the post-QoS-fix
+  map, and −1.92 % even on the pre-fix one. A map genuinely 12 % small
+  would have put that ceiling at 2.69 m. Errors that are 0.5 % on one
+  baseline and 12 % on another are not scale errors — scale is
+  proportional by definition.
 - **Every doorway number so far was measured in a 46.5°-tilted view.**
   The map is stored in `camera_init`, the IMU's orientation at t=0, and
   the IMU rides a ~45° mast. CloudCompare's "Top" was not a plan view and
@@ -715,15 +721,18 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    — a deliberate perturbation test would be the only way to probe it, and
    it is not worth doing while translation error stays at the noise level.
 2. ~~Measure the doorway.~~ **DONE 2026-08-01 — and it dissolved.** Scale
-   verified against the ceiling to −1.33 % over 3 m; the doorway shortfall
+   verified against the ceiling to −0.53 % over 3 m post-QoS-fix (−1.92 %
+   before it); the doorway shortfall
    is very likely a 28-inch door being compared to a 32-inch nominal. See
    "The 'doorway error' was probably never an error" above. Residual task
    is a tape measure on the real doorway, low priority.
 3. ~~Confirm or kill the frame-drop suspicion.~~ **DONE 2026-08-01 — it
    was real and it is fixed.** BEST_EFFORT depth 5 was dropping two-thirds
    of the cloud; reliable QoS takes it to 99.4%. See the landmine entry.
-   Worth re-running any density-sensitive conclusion now that the mapper
-   sees 3-6x more data — starting with a fresh map of the 8/01 bag.
+   The 8/01 bag was re-mapped through the fix the same day and metric
+   accuracy improved with it: floor→ceiling went −1.92 % → **−0.53 %**, a
+   +42.7 mm change against ±3.5 mm of method noise. Recovering the frames
+   did not just add points, it made the map measurably more accurate.
 4. ~~`allan_variance_ros` overnight.~~ **DONE 2026-08-01** — 8.58 h
    static capture, analysed with our own `allan.py`. See "IMU noise,
    measured" above. Outcome: every axis beats the datasheet on white
@@ -736,10 +745,16 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    (checkerboard) → Koide direct_visual_lidar_calibration. One lens per
    board, ±30–35° splay, 10–15° up-pitch. No hardware trigger found (ELP
    email pending); MJPEG-always rule.
-6. Stroller acquisition + mast-to-stroller build. **PARTIAL** — the
-   2026-08-01 photos show the rig mounted on a wheeled walking frame, so
-   the mast-to-chassis build exists. The target platform is a **jogger
-   stroller specifically for its pneumatic tires**: small hard wheels
+   **Nothing blocks the bond, measured 2026-08-01.** Both cameras sustain
+   3200×1200 simultaneously at 15 fps (30 fps fails on USB 2.0
+   isochronous bandwidth), and streaming them has **no measurable effect
+   on IMU timing** — 201.5 vs 201.6 Hz, identical intervals, zero gaps.
+   See the Cameras entry under Hardware. Do intrinsics *after* bonding,
+   and set 15 fps before calibrating so you calibrate at the rate you
+   will record at.
+6. ~~Stroller acquisition + mast-to-stroller build.~~ **DONE 2026-08-01**,
+   confirmed by Matt. The platform is a **jogger stroller chosen for its
+   pneumatic tires**, and that choice is now validated by measurement: small hard wheels
    transmit sharp shock over sidewalk joints, and the accelerometer has
    only 6.7× headroom to its ±8 g full scale against the 11.74 m/s² peak
    of an indoor hand-carried pass. Clipping the accel corrupts
@@ -803,12 +818,17 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    timing matter — the rig on a vehicle, or cameras with hardware sync.
    The `ptp4l` master config is ready at `ros2/config/ptp4l_lidar.conf`
    when that day comes.
-8. Longer outdoor capture with a closed loop to quantify drift.
+8. ~~Longer outdoor capture with a closed loop to quantify drift.~~
+   **DONE 2026-08-01** — `run_20260801_144508`, a 234 m sidewalk loop
+   returning to its start. **0.55 % drift**, of which only 10 cm is
+   vertical. See "First outdoor run" above. Frame accounting held at
+   99.8 % under 4× the indoor data volume. Further captures are now about
+   coverage rather than about establishing the number.
 9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
    dynamic removal → colorize → PINGS/Gaussian-LIC2 splats. 8 GB VRAM ⇒
    chunk scenes. Tier 2 later: ZED-F9P RTK via Indiana InCORS NTRIP (free).
 
-## Decisions taken 2026-08-01 that are not visible in the code
+## Decisions taken 2026-08-01/02 that are not visible in the code
 
 Recorded because they are cheap to re-litigate and the reasoning is not
 obvious from any config file.
@@ -832,7 +852,7 @@ obvious from any config file.
   single 954 GB NTFS partition labelled "Storage", unmounted, contents
   unknown; NTFS via ntfs-3g is FUSE-based and poor for sustained writes,
   so it would want reformatting before use.
-- **Battery monitoring — firmware written 2026-08-01, not yet flashed.**
+- **Battery monitoring — BUILT AND FLASHED 2026-08-01, awaiting wiring.**
   `firmware/battery_monitor/`. INA226 (0–36 V, I2C, 2 mΩ shunt) plus a
   Waveshare ESP32-C6-LCD-1.47, watching the **flooded lead-acid deep-cycle**
   pack. Wiring, confirmed against the board pinout diagram: INA226 VCC →
@@ -854,6 +874,21 @@ obvious from any config file.
   against a voltage trace instead of guessed at. Watch for a pin clash —
   the XIAO's GPS sits on D5/D4, which are the ESP32-S3's default I2C pins;
   remapping to D2/D3 should work but needs checking against the schematic.
+  - **A hardware low-voltage ALERT is wired to GP20** and drives the RGB
+    LED, because the point is to be noticed while pushing the stroller and
+    not looking at a screen. The INA226 raises it itself, so a hung sketch
+    cannot swallow it. Threshold 12.0 V rather than the 12.2 V half-charge
+    line: a pack sags ~0.1 V under a few amps, so alerting at 12.2 while
+    recording would cry wolf.
+  - **Two C6-specific build traps**, both cost a failed build: Arduino_GFX
+    1.4.x namespaces colours as `RGB565_*`, and `ARDUINO_USB_CDC_ON_BOOT=1`
+    needs `ARDUINO_USB_MODE=1` alongside it, because the C6 has USB
+    Serial/JTAG rather than the native USB-OTG that `USBSerial` requires.
+    The stock espressif32 platform also pins Arduino to 2.0.17, which
+    predates the C6 — hence the pioarduino fork in `platformio.ini`.
+  - **Every screen carries the build date and time.** Without it a board
+    showing the same "NO INA226" message before and after a reflash gives
+    no way to tell which firmware is running.
 - **A display on the XIAO would be for stillness and clipping, not tilt.**
   Starting attitude does not need to be consistent — the levelling rotation
   is derived per-run from logged gravity. The readouts actually worth
@@ -861,6 +896,22 @@ obvious from any config file.
   than counted) and live peak |accel| against the ±8 g limit, since
   clipping is silent. An I2C display needs 2 pins; the round display wants
   SPI plus CS/DC/backlight and would not fit alongside the IMU and GPS.
+- **The rig dashboard is laptop-fed over WiFi, not sensor-fed.**
+  `ros2/rig_status_node/` aggregates everything the laptop already knows —
+  sensor rates and staleness, both temperatures, GPS fix and position,
+  peak accel as a percentage of the ±8 g full scale, still-detection for
+  the dead-still init, disk headroom converted to recording hours at the
+  measured 135 GB/h, and whether a bag is recording — and serves it as
+  JSON on :8080. A display then only renders; adding a new reading later
+  is a laptop-side change rather than a reflash. It is already useful with
+  no new hardware, since it is reachable over Tailscale from a phone.
+  The M5Stack Tab5 is the intended screen (ESP32-P4 with an
+  ESP32-C6-MINI-1U co-processor, so it has WiFi 6 without extra parts;
+  5" 1280×720 touch; NP-F550 battery, ~6 h). The C6 monitor keeps a
+  distinct job: it works with the laptop **off**, which no WiFi dashboard
+  can. Temperatures are reported in both °F and °C in the JSON, but the
+  **ROS topics stay Celsius** because `sensor_msgs/Temperature` is defined
+  that way and changing it would break the contract silently.
 - **Lidar stays primary for pose; cameras become primary for the model.**
   Matt raised whether cameras should lead instead. For *trajectory*, lidar
   ranges directly while stereo error grows with the square of distance,
