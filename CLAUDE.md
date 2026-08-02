@@ -281,6 +281,17 @@ this file is the handoff. Read it fully before making changes.
 - Rig launch: `~/Desktop/rig_launch_v2.py` (repo `launch/rig.launch.py`) =
   hesai driver + its RViz + sensor bridge + optional `record:=true` bag.
 - Recording protocol: hold dead still 3–5 s at start (gravity/bias init).
+- **Thermal monitoring, added 2026-08-01.** Both temperatures now record
+  into every bag: `/imu/temperature` at 1 Hz and `/lidar/temperature` at
+  0.2 Hz. The IMU's reading was already being sent in every packet by the
+  XIAO firmware and silently discarded by the bridge — it is free data, and
+  it is the covariate that makes accelerometer bias drift correlatable
+  rather than mysterious, which matters because turn-on bias is the known
+  cause of the creeping ax yaw residual. The lidar's comes from the console
+  API via `ros2/lidar_temp_node/`. First readings: IMU 27.1 °C, lidar
+  38.6 °C — the lidar runs ~11 °C hotter than the IMU beside it.
+  Conversion `degC = TEMP_DATA/132.48 + 25` is transcribed from the
+  ICM-42688-P datasheet and flagged in source as not yet confirmed.
 - **Replay/export/analyse is one command**:
   `scripts/diagnostics/run_test.sh [bag] [voxel]` — preflight, mount
   signature, mapper, PCD export, extrinsic analysis, frame-drop count.

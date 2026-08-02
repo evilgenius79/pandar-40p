@@ -29,7 +29,10 @@ BAG_DIR = os.path.expanduser("~/bags")
 # ----------------------------------------------------------------------
 
 BRIDGE_PORT = "/dev/ttyACM0"
-RECORD_TOPICS = ["/lidar_points", "/imu/data_raw", "/gps/fix", "/gps/pps"]
+LIDAR_TEMP = os.path.expanduser(
+    "~/pandar-40p/ros2/lidar_temp_node/lidar_temp_node.py")
+RECORD_TOPICS = ["/lidar_points", "/imu/data_raw", "/gps/fix", "/gps/pps",
+                 "/imu/temperature", "/lidar/temperature"]
 
 
 def generate_launch_description():
@@ -42,6 +45,13 @@ def generate_launch_description():
         cmd=["python3", BRIDGE_SCRIPT, "--port", BRIDGE_PORT],
         name="sensor_bridge", output="screen")
 
+    # Thermal context for drift analysis. The IMU's own temperature now rides
+    # along in the bridge's stream; this adds the lidar's, polled from the
+    # console API. Both are cheap and neither existed before 2026-08-01.
+    lidar_temp = ExecuteProcess(
+        cmd=["python3", LIDAR_TEMP],
+        name="lidar_temp", output="log")
+
     bag_path = os.path.join(BAG_DIR,
                             datetime.now().strftime("run_%Y%m%d_%H%M%S"))
     record = ExecuteProcess(
@@ -49,4 +59,4 @@ def generate_launch_description():
         name="bag_record", output="screen",
         condition=IfCondition(LaunchConfiguration("record")))
 
-    return LaunchDescription([record_arg, lidar, bridge, record])
+    return LaunchDescription([record_arg, lidar, bridge, lidar_temp, record])

@@ -15,7 +15,7 @@ import struct
 import serial
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus, TimeReference
+from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus, TimeReference, Temperature
 
 ACCEL_LSB_PER_G = 4096.0     # must match firmware config (±8 g)
 GYRO_LSB_PER_DPS = 32.8      # must match firmware config (±1000 dps)
@@ -63,6 +63,14 @@ class SensorBridge(Node):
         self.pub_imu = self.create_publisher(Imu, "imu/data_raw", 200)
         self.pub_fix = self.create_publisher(NavSatFix, "gps/fix", 10)
         self.pub_pps = self.create_publisher(TimeReference, "gps/pps", 10)
+        # The ICM-42688-P ships a temperature reading in every IMU packet
+        # and it was being unpacked and discarded. MEMS bias drifts with
+        # temperature, and accel turn-on bias is the known cause of the
+        # creeping ax yaw residual, so this is the covariate that makes
+        # that correlatable. Decimated to ~1 Hz: 200 Hz of thermal data
+        # says nothing extra and would bloat every bag.
+        self.pub_temp = self.create_publisher(Temperature, "imu/temperature", 10)
+        self.temp_div = 0
         self.ser = serial.Serial(port, baud, timeout=0.05)
         self.clock = ClockMapper()
         self.buf = b""
@@ -124,6 +132,19 @@ class SensorBridge(Node):
         m.angular_velocity.z = gz / GYRO_LSB_PER_DPS * DEG
         m.orientation_covariance[0] = -1.0
         self.pub_imu.publish(m)
+
+        self.temp_div += 1
+        if self.temp_div >= 200:                 # ~1 Hz at 200 Hz ODR
+            self.temp_div = 0
+            t = Temperature()
+            t.header.stamp = m.header.stamp
+            t.header.frame_id = "imu_link"
+            # ICM-42688-P: degC = TEMP_DATA/132.48 + 25. TRANSCRIBED FROM THE
+            # DATASHEET, not yet confirmed against a copy in hand -- same
+            # caveat as the accel/gyro scale factors.
+            t.temperature = temp / 132.48 + 25.0
+            t.variance = 0.0
+            self.pub_temp.publish(t)
 
     def handle_pps(self, pkt):
         if crc16_ccitt(pkt[2:12]) != struct.unpack_from("<H", pkt, 12)[0]:
