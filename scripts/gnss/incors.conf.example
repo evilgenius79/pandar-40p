@@ -1,0 +1,30 @@
+# Indiana InCORS NTRIP caster (InDOT) -- TEMPLATE.
+#
+# Copy to ~/.config/ntrip/incors.conf, fill in the real values, chmod 600.
+# NEVER commit a filled-in copy: pandar-40p is a public GitHub repository,
+# and .gitignore deliberately excludes incors.conf for that reason.
+#
+#     install -m 600 /dev/null ~/.config/ntrip/incors.conf
+#     $EDITOR ~/.config/ntrip/incors.conf
+#
+# Values are masked here. The real caster address came from the InCORS
+# administrator by email along with the account; the sourcetable is public
+# once you can reach the host:
+#
+#     python3 scripts/gnss/ntrip_rover.py --sourcetable
+
+host=***.**.**.***
+port=****
+
+# Mountpoint. MSM4_VRS is the right one for this rig and the choice is
+# measured, not assumed -- see docs/rtk_gnss.md. The LG290P tracks GPS,
+# GLONASS, Galileo, BeiDou, QZSS and NavIC, and the legacy RTCM3_* streams
+# carry no Galileo or BeiDou corrections at all. Only the MSM4_* mountpoints
+# do.
+#   MSM4_VRS   virtual base synthesised at your position   <- use this
+#   MSM4_IMAX  network solution, real master station        <- fallback
+#   MSM4_NEAR  nearest single physical station              <- worst baseline
+mountpoint=MSM4_VRS
+
+user=**********
+password=**********

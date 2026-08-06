@@ -12,3 +12,7 @@ mapping_bags/
 .pio/
 __pycache__/
 *.pyc
+# credentials -- this repo is PUBLIC. Only the .example template is tracked.
+incors.conf
+**/incors.conf
+*.secret

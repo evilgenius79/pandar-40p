@@ -1,0 +1,28 @@
+# Stable names for the rig's USB serial devices.
+#
+#     sudo cp scripts/gnss/99-rig-serial.rules /etc/udev/rules.d/
+#     sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# WHY THIS IS NOT OPTIONAL ANY MORE. The IMU bridge hardcodes /dev/ttyACM0
+# (launch/rig.launch.py, ros2/imu_bridge_node/imu_bridge_node.py). The LG290P
+# enumerates as a CH343 USB-serial and takes /dev/ttyACM0 too -- verified
+# 2026-08-06, when it grabbed ACM0 with the XIAO unplugged. With both
+# attached, whichever enumerates first wins, and the loser silently gets the
+# wrong device: the bridge would try to parse NMEA as IMU packets, or the
+# NTRIP client would write RTCM into the IMU.
+#
+# Matching on idVendor/idProduct alone is not enough here -- 1a86:55d3 is a
+# generic QinHeng CH343, not specific to this module -- so the serial number
+# pins it.
+
+# u-blox... no: Quectel LG290P behind a CH343 bridge. Verified by udevadm.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", ATTRS{serial}=="5B90166916", SYMLINK+="gnss", MODE="0660", GROUP="dialout"
+
+# XIAO ESP32-S3 (IMU bridge). NOT YET FILLED IN -- the board was unplugged
+# when this file was written, so its idVendor/idProduct/serial have not been
+# read from the device and MUST NOT be guessed. With it plugged in:
+#
+#     udevadm info -a -n /dev/ttyACM0 | grep -E 'ATTRS\{(idVendor|idProduct|serial)\}' | head -3
+#
+# then uncomment and fill:
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="XXXX", ATTRS{serial}=="XXXXXXXX", SYMLINK+="imu", MODE="0660", GROUP="dialout"
