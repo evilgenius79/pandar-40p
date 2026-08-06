@@ -6,7 +6,9 @@
 *.pcd
 *.ply
 mapping_bags/
-# builds
-firmware/imu_bridge/.pio/
+# builds — every PlatformIO project, not one by name. The battery_monitor
+# project got 644 object files (66 MB) into git because this was a literal
+# path instead of a glob.
+.pio/
 __pycache__/
 *.pyc

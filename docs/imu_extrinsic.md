@@ -276,11 +276,29 @@ never moved T from its initialization at all.
 ## 6. Result
 
 Same course, same operator, one variable changed: divergent whip before,
-continuous multi-room geometry with planar walls after. Doorway measured
-0.77 m against 0.813 m nominal.
+continuous multi-room geometry with planar walls after.
 
 That result stands — but note it was achieved with 14.4° of undeclared
 roll error still in the system (§4a). Co-mounting fixed the gross fault,
-not the residual one. The 0.77 vs 0.813 m shortfall is now a live
-candidate for that 14.4°, alongside the roaming estimator; the first bag
-on the reseated mount is what will tell.
+not the residual one.
+
+**The "doorway 0.77 m vs 0.813 m nominal" shortfall that used to be quoted
+here is retracted (2026-08-01).** It was treated for a week as evidence of
+a residual mapping error, and blamed in turn on the 14.4°, on the roaming
+estimator, and on scale. It was none of those:
+
+- **Scale is sound.** Floor→ceiling measures 3.0445 ± 0.0035 m against a
+  taped 3.0607 m — **−0.53 %** over 3 m. An error that is 0.5 % on one
+  baseline and 12 % on another is not a scale error; scale is proportional
+  by definition.
+- **The nominal was wrong.** 0.813 m is a 32-inch door. Matt's tape reading
+  of 0.715 m is 28.15 in against a 28-inch slab at 0.711 m — a 0.15 in
+  match.
+- **Every doorway figure was measured in a ~46° tilted view.** The map is
+  stored in `camera_init`, the IMU's attitude at t=0, on a ~45° mast, so
+  CloudCompare's "Top" was not a plan view. Picking jamb faces in it is
+  unreliable at the 10 % level. Use `scripts/diagnostics/floorplan.py`,
+  which levels by the logged gravity vector.
+
+The real residual error is quantified elsewhere and honestly: **0.55 % of
+path** over a 234 m outdoor loop.

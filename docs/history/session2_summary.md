@@ -1,10 +1,25 @@
 # Session 2 summary (compressed) — 2026-07-29/30 "It Maps"
 
-Compressed handoff summary of the second working conversation, preserved
-verbatim. This is the session where SLAM was achieved: the absolute
-per-point-timestamp patch, the extrinsic whip diagnosis, the IMU co-mount,
-and the metric verification. Current truth lives in CLAUDE.md,
-docs/fastlio_setup.md, and docs/imu_extrinsic.md.
+Compressed handoff summary of the second working conversation, **preserved
+verbatim as a record of what was believed at the time**. This is the session
+where SLAM was achieved: the absolute per-point-timestamp patch, the
+extrinsic whip diagnosis, the IMU co-mount, and the metric verification.
+Current truth lives in CLAUDE.md, docs/fastlio_setup.md, and
+docs/imu_extrinsic.md.
+
+Superseded since:
+
+- **The IMU co-mount described here was 14.4° crooked about X.** It read as
+  correct because "identity by construction" was treated as a proof rather
+  than an assertion about workmanship. Reseated 2026-07-31.
+- **The doorway metric verification is retracted** — the 0.813 m nominal was
+  a 32-inch door against what the tape says is a 28-inch slab, and the
+  measurement was taken in a ~46° tilted view. Scale is separately verified
+  at −0.53 % against a taped ceiling.
+- **Every map from this session used a third to a half of its own data**, to
+  a BEST_EFFORT depth-5 subscription QoS bug fixed 2026-08-01.
+- The bag-cleanup note below says "seven 7/25 bags (~20 GB)". It is **eight,
+  ~70 GiB**, and nothing has been purged.
 
 ---
 

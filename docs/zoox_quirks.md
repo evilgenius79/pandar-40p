@@ -15,55 +15,77 @@ PA4038C35C9738C15F, fw 2.20.17. **Read this before powering one.**
   variants. If no link: swap wire polarity, then toggle S/M.
 - Full background: [t1_ethernet.md](t1_ethernet.md).
 
-## 2. THE ZERO-RANGES TRAP (laser_enable / Azimuth FOV)
+## 2. THE ZERO-RANGES TRAP — cause confirmed: `NoiseFiltering = 1`
 The worst one. Symptom: motor spins, full-rate 1262-byte packets stream,
 PandarView/driver decode structure, azimuths sweep — **every range and
 intensity byte is 0x0000.** Point clouds collapse to a blob at the origin.
+Nothing errors, which is exactly why it reads as dead hardware.
 
-Root cause chain (reconstructed):
-- Device Log JSON → `AzimuthFov` holds per-laser arrays: `laser_enable[40]`
-  and `laser_range[40]`.
-- **Saving the Azimuth FOV web page can persist these arrays in broken
-  states.** Observed states: `laser_enable` all-0 (lasers disabled → zero
-  ranges at full packet rate), and after a per-channel save of default rows:
-  enable all-1 but `laser_range` all `[0,0]` (zero-width windows → packet
-  output stops almost entirely; lone malformed 1180-byte zero frames at boot).
-- The per-channel page loads rows as enabled/0.0–0.0 — **saving it as-loaded
-  muzzles the sensor.**
+**Reproduced on demand 2026-08-01 and fully reversible.** Toggling one
+setting moves the unit in and out of the fault:
 
-### Diagnosis
-Web console → Device Log (JSON) → `AzimuthFov`:
-- `laser_enable` must be all **1**
-- `laser_range` must be all **[0,3600]** (tenths of a degree)
-Also check tcpdump: `sudo tcpdump -i <iface> udp port 2368 -c 1 -X` — real
-data shows non-zero bytes between the `ffee` block markers.
+| state | pts/frame | zero-range | median range |
+|---|---|---|---|
+| `NoiseFiltering=0` | 144,000 | 0.1 % | 1.78 m |
+| **`NoiseFiltering=1`** | 144,400 | **100.0 %** | 0.00 m |
+| back to `0` | 144,000 | 0.1 % | 1.78 m |
 
-### Fix that worked
-**Factory reset from the web console**, then re-apply minimal settings.
-Manual per-channel repair (all rows 0→360, Save, power cycle) writes the
-arrays but did not restore ranging in our case; factory reset did,
-immediately (verified in PandarView, then ROS).
+### Fix — one call, no factory reset
+Mind the firmware's spelling, `noise_filtring`:
 
-### Rules going forward
-- **Never press Save on the Azimuth FOV page.** Look with eyes only.
-- After any config change, re-pull Device Log JSON and verify the two arrays.
-- Power cycle after config changes; verify with tcpdump before blaming
-  software.
+```bash
+curl -s "http://192.168.1.201/pandar.cgi?action=set&object=lidar_data&key=noise_filtring&value=0"
+```
 
-## 3. NoiseFiltering observation
-The broken (zero-ranges) state had `NoiseFiltering: 1`; factory default is
-**0 (off)**. Causal role unproven (reset cleared everything at once), but:
-**leave it OFF** — raw returns are what the SLAM/offline pipeline wants;
-outlier filtering happens in post where it's visible and tunable.
+### What this retracts
+- **The Azimuth FOV page was probably never the culprit.** It inherited the
+  blame because the factory reset that recovered the unit also cleared
+  `NoiseFiltering` as a side effect — one action, two changes, and the wrong
+  one got the credit. Matt's recollection that the FOV page was innocent was
+  right and these docs were wrong. Still no reason to go pressing Save
+  there, but that is general caution, not a known fault.
+- **"Manual repair failed; only a factory reset fixed it" was a
+  misattribution.** Manual repair failed because it was repairing the wrong
+  setting.
+- **The old diagnostic check was itself wrong** and false-alarms on a
+  healthy lidar. It said to verify `laser_enable` all-1 and `laser_range`
+  all-`[0,3600]`. Those per-laser arrays are only live when
+  `angle_setting_method` is `1`. This unit runs method `0`, where the global
+  `lidar_range` governs and **the per-laser arrays read all-zero normally**.
+
+### Diagnosis, corrected
+```bash
+python3 scripts/diagnostics/lidar_config.py
+```
+It reads `angle_setting_method` first and reports which block is actually in
+force, so an all-zero array is interpreted rather than panicked over. Check
+`NoiseFiltering` before suspecting anything else. Independent confirmation
+from the wire: `sudo tcpdump -i <iface> udp port 2368 -c 1 -X` — real data
+shows non-zero bytes between the `ffee` block markers.
+
+## 3. NoiseFiltering — leave it OFF
+Factory default is **0 (off)**, and section 2 is why: `1` is the confirmed
+cause of the zero-ranges fault on this unit. Beyond that, raw returns are
+what the SLAM and offline pipeline want — outlier filtering belongs in post,
+where it is visible and tunable.
 
 ## 4. Safe operating posture
 Factory defaults + minimum deliberate changes only:
 - IP 192.168.1.201 (factory), host 192.168.1.100/24
-- Spin rate 600 rpm, Return Mode: note default after reset; Strongest is the
-  clean indoor choice, Dual for vegetation
-- Clock Source: GPS default is fine until ptp4l is deployed; then PTP
+- Spin rate **600 rpm — settled**. 1200 rpm adds no data: the firing rate is
+  fixed, so it halves azimuth resolution (0.2° → 0.4°) to double the frame
+  rate. It earns its keep at vehicle speeds, not on a stroller.
+- Return Mode: this unit runs **Dual** (`lidar_mode` = 2, confirmed from both
+  the console and the data). Kept on for outdoor work — second returns punch
+  through foliage, and the 2026-08-01 map shows internal canopy structure
+  rather than a solid shell. Indoors it is mostly edge noise at double the
+  bandwidth, since FAST-LIO2 has no concept of return number.
+- Clock Source: GPS default is fine **only while `use_timestamp_type: 1`**.
+  Read `docs/lidar_console.md` before touching it — switching the driver to
+  sensor timestamps with the wrong clock source is a silent failure.
 - Everything else: untouched. Every optional toggle is guilty until proven
-  innocent (FOV page: convicted; NoiseFiltering: under indictment).
+  innocent — **`NoiseFiltering`: convicted on reproduction; FOV page:
+  acquitted, see section 2.**
 
 ## 5. Other identifiers / facts
 - Model string over PTC/web: **PA40-Zoox** (not "Pandar40P") — driver PTC

@@ -296,19 +296,47 @@ First successful map, 2026-07-30:
 | Raw registered points | 25,666,477 |
 | After 5 cm voxel | 261,947 |
 | After 2 cm voxel | 1,877,815 |
-| Doorway measured | 0.77 m (0.813 m nominal) |
+| Doorway measured | 0.77 m — **retracted**, see below |
 
 The ~99% reduction at 5 cm is arithmetic, not data loss: a house interior is
 roughly 500–600 m² of surface, which at 5 cm is about 220k occupied voxels.
 The other 25 million points are the same surfaces seen repeatedly.
 
+**Two caveats on this table, both found later:**
+
+- **The doorway figure is retracted.** 0.813 m is a 32-inch nominal for what
+  the tape says is a 28-inch door, and every doorway measurement was taken
+  in a ~46° tilted CloudCompare view. Scale is verified independently
+  against a taped ceiling at **−0.53 %**. See docs/imu_extrinsic.md §6.
+- **This run used a third to a half of its own data.** The mapper subscribed
+  with `SensorDataQoS()` — BEST_EFFORT, depth 5 — and silently dropped most
+  of a ~35 MB/s PointCloud2 stream. 483 of 871 frames reached it here. Fixed
+  2026-08-01 (99.4 % after), and metric accuracy improved measurably with
+  it. Every point count above is therefore a lower bound.
+
 ---
 
 ## 8. Next steps
 
-- Check what `extrinsic_est_en` converged to versus the 7 cm hand
-  measurement; adopt the estimate if it is stable across runs
-- `allan_variance_ros` overnight for real IMU noise parameters
-- PTP time sync, then revert `use_timestamp_type` to `0`
-- Longer outdoor capture with loop closure to quantify drift
-- Offline chain: GLIM → HBA → dynamic removal → colorize
+- [x] **Frame drop confirmed and fixed** — reliable QoS in place of
+  `SensorDataQoS()`; 99.4 % of frames processed, and floor→ceiling accuracy
+  went −1.92 % → −0.53 % with the recovered data
+- [x] **`extrinsic_est_en` checked against the hand measurement.** R is
+  resolved: identity within 0.65° on every axis once the mount was straight.
+  T is *not* observable in this data — it has never moved more than ~2 mm
+  from its initialization, including from a value ~6 cm wrong — so it rests
+  on the tape alone: `[-0.057, -0.023, 0.047]`
+- [x] **IMU noise characterised** — 8.58 h static, lidar unplugged. Every
+  axis beats the datasheet on white noise. `allan_variance_ros` is ROS 1
+  only; `scripts/diagnostics/allan.py` computes it from the `.db3`.
+  **Do not paste the derived covariances into the config** — FAST-LIO's
+  defaults sit 5–8 orders higher on purpose, absorbing un-modelled error
+- [x] **Outdoor capture with loop closure** — 234 m sidewalk loop,
+  **0.55 % drift**, only 10 cm of it vertical
+- [ ] PTP time sync, then revert `use_timestamp_type` to `0` — **deferred**.
+  No PTP hardware on any interface on this machine, and software PTP buys
+  ~0.4 mm at walking pace against 1,277 mm of measured drift. It is
+  correctness, not accuracy, and type 0 without a solid lock re-creates the
+  silent timestamp-domain failure that cost days in July
+- [ ] Camera aim → panel bond → intrinsics → lidar-camera calibration
+- [ ] Offline chain: GLIM → HBA → dynamic removal → colorize

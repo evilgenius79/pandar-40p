@@ -250,11 +250,19 @@ curl -s "http://192.168.1.201/pandar.cgi?action=set&object=lidar_data&key=noise_
 Full console reference, including every API object and the ones that erase
 calibration: `docs/lidar_console.md`.
 
-**Historically we were told never to press Save on the Azimuth FOV page.** It can persist
-`laser_enable` all-zero and zero-width `laser_range` windows, leaving the
-unit spinning and streaming with every range `0x0000`. Manual repair failed
-last time; only a factory reset fixed it. Verify via Device Log JSON:
-`laser_enable` all-1, `laser_range` all-`[0,3600]`.
+**The Azimuth FOV page's guilt is retracted.** It was blamed for the
+zero-ranges fault for weeks, because the factory reset that recovered the
+unit also cleared `NoiseFiltering` as a side effect. The 2026-08-01
+reproduction pins the cause on `NoiseFiltering` alone, and no reset is
+needed. Still no reason to go pressing Save there, but that is caution, not
+a known fault.
+
+**Do not use the old "`laser_enable` all-1, `laser_range` all-`[0,3600]`"
+check** — it false-alarms on a healthy lidar. Those per-laser arrays are
+only live when `angle_setting_method` is `1`; this unit runs method `0`,
+where the global `lidar_range` governs and the per-laser arrays read all
+zero *normally*. `lidar_config.py` reads the method first and says which
+block is actually in force.
 
 ## 10. Git
 

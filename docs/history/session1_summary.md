@@ -1,10 +1,26 @@
 # Session 1 summary (compressed) — through 2026-07-26 "First Light"
 
-Compressed handoff summary of the first working conversation, preserved
-verbatim. Some values were superseded by later work (tilt measured 58.2°
-not 45°; IMU later co-mounted under the lidar; the 7/26 bag's Y2K/2026
-timestamp split was fixed by `use_timestamp_type: 1`). Current truth lives
-in CLAUDE.md, docs/fastlio_setup.md, and docs/imu_extrinsic.md.
+Compressed handoff summary of the first working conversation, **preserved
+verbatim as a record of what was believed at the time**. Several claims in
+it have since been disproved. Do not act on anything here — current truth
+lives in CLAUDE.md, docs/fastlio_setup.md, docs/imu_extrinsic.md and
+docs/lidar_console.md.
+
+Superseded, in the order they matter:
+
+- **The zero-ranges trap is `NoiseFiltering = 1`, not the Azimuth FOV page.**
+  The text below blames the FOV Save button and says only a factory reset
+  recovered the unit. Reproduced on demand 2026-08-01: the fault toggles
+  cleanly with `NoiseFiltering` and one `curl` undoes it. The reset got the
+  credit because it cleared that setting as a side effect.
+- **The "verify `laser_enable` all-1, `laser_range` all-`[0,3600]`" check is
+  wrong** and false-alarms on a healthy lidar — those arrays are inactive
+  unless `angle_setting_method` is `1`, and this unit runs `0`.
+- **The ~58° tilt figure was a crooked IMU, not the mast.** The mount was
+  14.4° off about X until the 2026-07-31 reseat. The mast is ~45–47°, as
+  originally built.
+- The IMU was later co-mounted under the lidar; the 7/26 bag's Y2K/2026
+  timestamp split was fixed by `use_timestamp_type: 1`.
 
 ---
 

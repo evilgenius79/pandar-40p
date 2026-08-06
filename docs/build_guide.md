@@ -163,7 +163,10 @@ first, swap to ICM with zero laptop-side changes.
 6. **LIO_SAM_6AXIS** (outdoor GNSS fusion; stock LIO-SAM needs 9-axis — skip upstream).
 7. Support: linuxptp, gpsd, chrony, v4l-utils, OpenCV, Open3D, CloudCompare,
    Docker (for ROS 1-era refinement tools), rosbag2.
-8. Calibration tools: allan_variance_ros, Koide direct_visual_lidar_calibration.
+8. Calibration tools: Koide direct_visual_lidar_calibration. For IMU noise,
+   **not** `allan_variance_ros` — it is a catkin/ROS 1 package with no ROS 2
+   branch. Use `scripts/diagnostics/allan.py`, which reads the `.db3`
+   directly. Done 2026-08-01.
 
 ### Phase 6 — Time sync
 `ptp4l` master on the wired NIC → lidar Clock Source = **PTP** in web control →
@@ -221,11 +224,18 @@ Dwell time adds nothing — viewpoints add everything.
 | ELP dual-lens GS: OG02B10, 3200×1200 synced, USB2 UVC, 75–170° lens options | ELP pages |
 
 ## 6. Open items / verify-on-arrival
-- [ ] Lidar bench test inside warranty window — **top priority**
-- [ ] ICM board: "42688" marking, regulator range, CS continuity
-- [ ] ELP cameras: written **color** confirmation before ordering
-- [ ] Cable wire colors vs pinout (continuity beep at cut)
-- [ ] FAST-LIO2 Hesai point-format config (one evening)
+- [x] Lidar bench test inside warranty window — passed; the zero-ranges
+  scare was `NoiseFiltering=1`, not dead hardware
+- [x] ICM board: "42688" marking, regulator range, CS continuity — verified,
+  and later characterised over an 8.58 h static run (beats its datasheet on
+  white noise on every axis)
+- [x] ELP cameras: confirmed and in hand. **Only one lens per board is used**
+  — the dual-lens boards were the cheaper way to buy two sensors, not a
+  stereo pair, so camera↔camera sync is irrelevant
+- [x] Cable wire colors vs pinout — verified at the cut; orange pair
+  (Lemo 7/8) is the T1 data pair
+- [x] FAST-LIO2 Hesai point-format config — done, and it needed two source
+  patches, not just config (`patches/fastlio_pandar40p.patch`)
 - [ ] GLIM build with CUDA on 22.04 (verify current repo instructions at build time)
 - [ ] InCORS NTRIP account/mountpoint details for the Rushville area (Tier 2)
 - [ ] Laptop lid-close + sustained-load thermal behavior in the stroller

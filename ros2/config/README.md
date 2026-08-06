@@ -35,12 +35,27 @@ Two things this config depends on, both non-obvious:
   the per-point time field to `double` and rebases absolute epoch per-point
   timestamps to frame-relative. Without them `sync_packages` never fires and
   the mapper fails silently. See `docs/fastlio_setup.md`.
-- **`extrinsic_R` is identity by construction**, not derived from mount
-  geometry. The IMU is physically co-mounted under the lidar with its axes
-  parallel, so the mast tilt (**~58° from vertical, gravity-derived** — not the
-  ~45° originally planned) cancels out. Do not re-derive it, and never smuggle a
-  display yaw in — see `docs/imu_extrinsic.md`. `extrinsic_T` is the 7 cm
-  tape-measured IMU→optical-origin offset up the spin axis.
+- **`extrinsic_R` is identity — and that is now earned by measurement, not
+  asserted.** The IMU is physically co-mounted under the lidar with its axes
+  parallel, so the mast tilt (**~45–47° from vertical**: Klein gauge ~47°,
+  post-reseat gravity 44.5°, mast built for ~45°) cancels out. Do not
+  re-derive it, and never smuggle a display yaw in — see
+  `docs/imu_extrinsic.md`.
+  - **"By construction" was false for a week.** The first co-mount sat 14.4°
+    crooked about X and nobody checked, because the phrase was treated as a
+    proof. It was reseated 2026-07-31; on the first bag afterwards the online
+    estimator lands at roll +0.64°, pitch +0.38°, yaw −0.26°, against −6.1° of
+    roll before. Re-verify with gravity after **any** mount work.
+  - An older note here gave the tilt as "~58° from vertical, gravity-derived".
+    That was the crooked IMU talking, not the mast. Retracted.
+- **`extrinsic_T` is `[-0.057, -0.023, 0.047]`**, tape-measured 2026-08-01:
+  the IMU sits 5.7 cm left, 2.3 cm aft and 4.7 cm below the lidar centre, and
+  the config wants the negation because it expresses the lidar in IMU axes
+  (`R*p_lidar + T`, verified in `laserMapping.cpp:895` → `IMU_Processing.hpp:327`).
+  The old "7 cm up the spin axis" figure predates the reseat.
+  **T rests on the tape alone** — it is effectively unobservable in this data,
+  and the estimator has never moved it more than ~2 mm from wherever it was
+  initialized, including on a run where it started ~6 cm wrong.
 
 Launch with an **absolute** config path — relative paths resolve against the
 install tree and silently load the wrong file.
