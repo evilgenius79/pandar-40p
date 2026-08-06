@@ -28,7 +28,7 @@ refinement and photoreal outputs (meshes, Gaussian splats) afterward on the RTX 
    │  ICM-42688-P IMU ──SPI── XIAO ESP32-S3 bridge        │
    │  2× ELP dual-lens GS camera boards (splayed ±30°,    │
    │     pitched up ~10–15°, in the lidar's blind cone)   │
-   │  GNSS antenna (M10 now → ZED-F9P RTK in Tier 2)      │
+   │  GNSS antenna (M10 now → LG290P RTK, in hand)        │
    └──────────────┬───────────────────────────────────────┘
                   │  Ethernet (lidar) + USB (IMU bridge,
                   │  cameras, GNSS)
@@ -40,13 +40,18 @@ refinement and photoreal outputs (meshes, Gaussian splats) afterward on the RTX 
         OFFLINE: GLIM (global optimization) → HBA/BALM refinement
                  → dynamic removal → colorization → mesh / 3DGS
                   ▲
-        12 V-class tool battery → lidar ONLY (~18 W, fused)
+        12 V deep-cycle → whole rig (fused at the terminal,
+        INA226 + ESP32-C6 monitor with hardware low-voltage ALERT)
 ```
 
-**Time sync:** laptop = single clock master. Lidar via **PTP** (`ptp4l` master on
-the wired NIC; lidar clock source set to PTP in web control — works indoors and
-out). IMU hardware-timestamped on the ESP32-S3 and correlated to laptop time.
-Cameras software-timestamped on arrival. GNSS = position, not timing.
+**Time sync:** laptop = single clock master. Currently `use_timestamp_type: 1`
+(host receive time) — correct and working. **PTP is DEFERRED, not pending:** this
+machine has no PTP hardware on any interface (`ethtool -T` reports
+`PTP Hardware Clock: none` on the onboard NIC, the wifi, and both USB adapters),
+so any PTP here is software-timestamped. At the measured 0.93 m/s walking pace it
+would buy ~0.4 mm against 1,277 mm of measured drift, while risking the silent
+timestamp-domain failure that cost days in July. IMU hardware-timestamped on the
+ESP32-S3. Cameras software-timestamped on arrival. GNSS = position, not timing.
 
 ---
 
@@ -56,17 +61,17 @@ Cameras software-timestamped on arrival. GNSS = position, not timing.
 |---|------|--------|-------|
 | 1 | Hesai Pandar40P | Purchased ($149, 30-day warranty from Jun 27 2026) | 40 ch, −25°/+15°, ~200 m, DC 9–48 V ~18 W max 3 A, no power switch, lens film must come off |
 | 2 | Laptop (i7-12650H, RTX 4060 8 GB, 32 GB, GbE) | Owned | Capture + SLAM + all post-processing. 8 GB VRAM is the known ceiling for big splat scenes — chunk large scans |
-| 3 | ICM-42688-P breakout | Ordered | Primary IMU. Verify "42688" marking on arrival. **Allan-variance calibrate before first mapping run (Tier 1)** |
+| 3 | ICM-42688-P breakout | **In service** | Primary IMU, ~201 Hz. Allan variance DONE 2026-08-01 (8.58 h static) — beats datasheet white noise on every axis. **Do not paste the derived covariances into the config**: FAST-LIO's defaults sit 5–8 orders higher on purpose |
 | 4 | MPU6050 | Owned | Bring-up stand-in only |
 | 5 | XIAO ESP32-S3 | Owned | USB IMU timestamping bridge, 200+ Hz |
-| 6 | 2× ELP dual-lens GS boards (OG02B10) | To order | **Confirm COLOR in writing.** One lens used per board. Research verdict: do NOT chase higher-res cameras — poor quality/$ here |
-| 7 | u-blox M10 | Owned | Tier-1 GNSS (meter-level). Superseded outdoors by #13 |
+| 6 | 2× ELP dual-lens GS boards (OG02B10) | **On rig, not yet aimed/bonded** | One lens used per board — the boards are dual-lens for cost, not stereo. Both sustain 3200×1200 @ 15 fps; 30 fps fails on USB 2.0 isochronous bandwidth. No measurable effect on IMU timing |
+| 7 | u-blox M10 | Owned | Tier-1 GNSS (meter-level). Superseded outdoors by #13. L1-only, so it can never use the InCORS L1+L2 streams |
 | 8 | 16-pin waterproof connector pair | Ordered | Replaces the Lemo mid-cable |
-| 9 | Jogging stroller, pneumatic tires | To acquire | Air tires = the vibration fix; keep lidar+IMU rigidly coupled as one head (never isolate them from each other) |
-| 10 | Mast + brackets | To build | ~2 m, triangulated bracing, adjustable tilt (30/40/45°) |
-| 11 | 18–20 V tool battery + plate + 3 A fuse | Owned/cheap | Lidar only; ~2.5 h per 5 Ah pack |
+| 9 | Jogging stroller, pneumatic tires | **In service** | Air tires were the vibration fix and it is now measured: peak 32.59 m/s² = 42 % of ±8 g, zero samples above 50 % → **isolators not needed**. Keep lidar+IMU rigidly coupled as one head (never isolate them from each other) |
+| 10 | Mast + brackets | **Built, in service** | welded, plug-AFT, ~45–47° from vertical. The "~58°" figure that circulated for a week was a crooked IMU, not the mast |
+| 11 | 12 V flooded lead-acid deep cycle + fuse | **In service** | Powers the whole rig, not just the lidar. INA226 + ESP32-C6 monitor built and flashed, awaiting wiring. Fuse at the battery terminal |
 | 12 | Checkerboard target | Owned | Camera intrinsics (extrinsics now go targetless — see Tier 1) |
-| 13 | **u-blox ZED-F9P RTK board + L1/L2 antenna** (SparkFun/Ardusimple, ~$200–275) | Tier 2 purchase | Dual-freq RTK. Corrections FREE via Indiana **InCORS** NTRIP (state CORS network covers Rushville area). Transforms outdoor georeferencing to cm-class |
+| 13 | **Quectel LG290P RTK module** (bought instead of the planned ZED-F9P) | **In hand, working 2026-08-06** | Multi-band RTK, six constellations. Corrections FREE via Indiana **InCORS** NTRIP — confirmed free by Matt, despite the sourcetable advertising `fee=Y`. RTK float achieved in 1.8 s; fixed not yet reached (needs open sky). See docs/rtk_gnss.md |
 
 ---
 
@@ -77,15 +82,15 @@ Cameras software-timestamped on arrival. GNSS = position, not timing.
 |---|---|
 | **GLIM added to the stack** | Global-optimization SLAM (GPU-capable, ROS 2 friendly). FAST-LIO2 stays as the live view; GLIM re-processes the same bags offline for globally consistent maps. Highest quality-per-effort finding of the research |
 | **Record-raw doctrine** | rosbag2 captures raw lidar packets + IMU + camera + GNSS on every run, no exceptions |
-| **IMU intrinsic calibration** | Overnight static log → Allan variance (allan_variance_ros) → real noise/bias params into FAST-LIO2/GLIM configs. Research verdict: proper calibration of the ICM-42688-P closes most of the gap to tactical IMUs → **tactical IMU purchase skipped** |
+| **IMU intrinsic calibration** — DONE 2026-08-01 | 8.58 h static log → Allan variance. **`allan_variance_ros` is ROS 1 only**; `scripts/diagnostics/allan.py` computes it from the `.db3`. Outcome: every axis beats datasheet white noise, and the params were deliberately **NOT** pasted into the config — FAST-LIO's inflated defaults absorb un-modelled error, and operational noise is 2–3× the quiet figure because the lidar motor injects a 10 Hz line at 104× the noise floor. Tactical IMU purchase still skipped |
 | **Targetless camera↔lidar extrinsics** | Koide's `direct_visual_lidar_calibration` — better extrinsics than checkerboard-only, no target ceremony. Checkerboard still used for camera *intrinsics* |
-| **Lidar settings locked** | **600 rpm (10 Hz)** for max per-frame density at walking speed; single-return (strongest) initially; dual-return reserved as an experiment for vegetation-heavy streets. Verify no per-channel calibration anomalies against the auto-imported correction file |
+| **Lidar settings locked** | **600 rpm (10 Hz)** — settled: 1200 rpm adds no data, it halves azimuth resolution (0.2°→0.4°) to double frame rate, since the firing rate is fixed. **Dual return is ON and stays on** (Matt's call, vindicated by the 2026-08-01 map where canopy shows internal structure rather than a solid shell). Indoors it is mostly edge noise at double the bandwidth — FAST-LIO2 has no concept of return number |
 | **Fixed exposure while scanning** | Lock camera exposure/gain per run (auto-exposure flicker degrades colorization consistency); pick per-environment |
 
 ### Tier 2 — after the rig works end-to-end
 | Change | What/why |
 |---|---|
-| **RTK GNSS: ZED-F9P + InCORS NTRIP** | Free state correction network + ~$250 hardware = cm-level outdoor trajectory anchoring and true georeferencing. Fuse via GNSS factors (LIO_SAM_6AXIS / GLIM GNSS constraints). The standout big-ticket item |
+| **RTK GNSS: LG290P + InCORS NTRIP** | Free state correction network = cm-level outdoor trajectory anchoring and true georeferencing. Fuse via GNSS factors (LIO_SAM_6AXIS / GLIM GNSS constraints). Hardware in hand and streaming as of 2026-08-06. **Note FAST-LIO2 ignores GPS entirely** — this buys georeferencing and an independent drift score, not a better live trajectory |
 | **Offline refinement chain** | GLIM output → **HBA** (hierarchical bundle adjustment) / BALM pass → measurably tighter walls/edges. Some tools are ROS 1 era — run them in Docker containers rather than fighting Humble |
 | **Dynamic object removal** | Street scans: Removert / ERASOR / dynablox / BeautyMap-class tools to erase pedestrians+cars from the final map (RTX 4060 helps here) |
 | **Splat pipeline** | LiDAR-seeded 3D Gaussian splatting (PINGS / Gaussian-LIC2-class pipelines): initialize splats from the refined cloud + camera frames + trajectory. Chunk scenes to respect 8 GB VRAM |
@@ -218,7 +223,7 @@ Dwell time adds nothing — viewpoints add everything.
 | Stock LIO-SAM requires 9-axis IMU; LIO_SAM_6AXIS adds 6-axis + low-cost GNSS | Official GitHubs |
 | GLIM: global-optimization SLAM, GPU-capable, ROS 2 friendly — top research pick | Research report |
 | Calibrated ICM-42688-P ≈ closes most gap to tactical IMUs at walking speed | Research report |
-| ZED-F9P + free Indiana InCORS NTRIP = cm-class RTK for ~$200–275 hardware | Research report |
+| Free Indiana InCORS NTRIP = cm-class RTK. Research named the ZED-F9P; the LG290P was bought instead and works | Research report + verified on hardware 2026-08-06 |
 | Higher-res cameras & tactical IMU: poor quality/$ for this rig — skipped | Research report |
 | 8 GB VRAM = chunk large splat scenes; some refinement tools need ROS 1/Docker | Research report |
 | ELP dual-lens GS: OG02B10, 3200×1200 synced, USB2 UVC, 75–170° lens options | ELP pages |

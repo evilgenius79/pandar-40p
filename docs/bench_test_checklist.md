@@ -55,8 +55,18 @@
    - [ ] Record from Device Info: serial number, software/firmware versions.
    - [ ] Click **Device Log** → save the JSON (baseline + warranty evidence).
    - [ ] Confirm Spin Rate reads **600 rpm** (factory default = 10 Hz frames).
+   - [ ] Confirm **Noise Filtering is OFF**, or run
+     `python3 scripts/diagnostics/lidar_config.py` (read-only).
+     **This is the one that will waste your day.** With `NoiseFiltering=1`
+     the unit spins, streams a full-rate 144k-point cloud, and puts *every
+     point at the origin* — nothing errors, so it reads as dead hardware
+     and a warranty return. Confirmed by reproduction 2026-08-01; recovery
+     is one call, no factory reset (mind the firmware's spelling):
+     `curl -s "http://192.168.1.201/pandar.cgi?action=set&object=lidar_data&key=noise_filtring&value=0"`
 10. [ ] **PandarView 2:** open live view.
     - [ ] Full 360° point cloud appears, no missing wedges.
+    - [ ] **Ranges are non-zero.** All-zero ranges → see the Noise Filtering
+      note above, *not* a dead sensor and not the Azimuth FOV page.
     - [ ] All 40 channels returning (view a flat wall: should show 40 distinct scan lines; the 40P imports its calibration file automatically — verified, troubleshooting §8).
     - [ ] No persistent flashing/misaligned points (per manual troubleshooting: flashing points with zero packet loss = software issue, not sensor).
     - [ ] Record a 60-second **PCAP** baseline file and save it.

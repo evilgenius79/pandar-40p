@@ -1,5 +1,15 @@
 # Repo update — 2026-07-26 ("First Light")
 
+> **OBSOLETE — kept only as a record.** This file was a manual upload
+> checklist from when the repo was maintained through the GitHub web UI.
+> Since 2026-07-31 changes are pushed with git, so there is nothing to
+> "upload" and this list is not a task.
+>
+> It also repeats the **retracted** zero-ranges explanation. That fault is
+> `NoiseFiltering=1`, reproduced on demand 2026-08-01 and reversible with a
+> single `curl` — no factory reset, and the Azimuth FOV page was probably
+> never the culprit. See `docs/lidar_console.md` and `docs/zoox_quirks.md`.
+
 Upload these changed/new files over the existing repo (GitHub web: Add file →
 Upload files, drag folders to preserve paths):
 

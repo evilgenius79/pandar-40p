@@ -80,9 +80,11 @@ STR;MSM4_VRS;MSM4_VRS;RTCM 3;;2;GPS+GLO+GAL+BDS;InDOT;;40.28;-86.06;1;1;Leica GN
   synthesises observations at the position you report, so with no GGA there
   is nothing to synthesise. This is why `ntrip_rover.py` is bidirectional.
 - **`authentication = B`** → HTTP Basic. Sourcetable is open, streams are not.
-- **`fee = Y`.** Flagged, not resolved: our notes have said "free InCORS"
-  since the research phase and this contradicts them. It may only encode
-  "registration required". Worth one question to the administrator.
+- **`fee = Y` is a lie in the sourcetable — InCORS is free.** Confirmed by
+  Matt 2026-08-06, who holds the account. The flag is set on every InCORS
+  mountpoint and evidently just encodes "registration required". Do not
+  re-raise this; the "free InCORS" note carried since the research phase was
+  right.
 
 `MSM4_VRS` over `MSM4_NEAR`: VRS puts a virtual base at your location, so
 the effective baseline is ~0. `NEAR` uses the closest *physical* station and
@@ -115,15 +117,39 @@ python3 scripts/gnss/ntrip_rover.py --no-inject        # receive, do not write
 | 4 | RTK **fixed** — centimetres |
 
 Measured first run, indoors: `1 → 5 in 1.8 s`, 25 satellites, 47.8 kB of
-RTCM in 75 s (~0.6 kB/s). **It did not reach 4.** That is expected indoors —
-resolving carrier-phase integers needs clean multipath-free sky. Getting to
-fixed outdoors is the next test and has not been done.
+RTCM in 75 s (~0.6 kB/s). Second run reached float in 7.2 s. **Neither
+reached 4.** That is expected indoors — resolving carrier-phase integers
+needs clean multipath-free sky. Getting to fixed outdoors is the next test
+and has not been done.
+
+**Float is visibly float.** Over 52 s with the antenna stationary,
+corrections healthy (age 1.1 s, 29 sats):
+
+| | start | end | drift |
+|---|---|---|---|
+| latitude | 39.61369863 | 39.61372369 | **2.79 m** |
+| longitude | −85.44416439 | −85.44416466 | 0.03 m |
+| altitude | 298.634 m | 301.341 m | **2.71 m** |
+
+A fixed solution would hold still to a few centimetres. Metre-level wander
+on a stationary antenna *is* the unresolved integer ambiguity, and it is the
+reason float is not good enough to georeference a map with.
+
+Sanity check on the absolute value: autonomous read 290.580 m before
+corrections, RTK float reads ~300 m, and Rushville sits near 300 m. The
+corrections moved altitude about 10 m toward the believable number.
+
+**Corrections age (GGA field 13) is the fastest diagnostic.** Empty means no
+RTCM is arriving at all; ~1 s means the link is healthy. After the client
+stops, the receiver coasts on aging corrections and reports quality 2
+(DGPS) for a while before dropping to 1 — so seeing 2 does not mean the
+NTRIP client is running.
 
 ## 6. Two things that will bite
 
 - **`/dev/ttyACM0` is now contested.** The LG290P enumerates as a CH343 and
   takes `ttyACM0`; the IMU bridge *hardcodes* `ttyACM0`
-  (`launch/rig.launch.py:31`). With both plugged in, enumeration order
+  (`launch/rig.launch.py:48`). With both plugged in, enumeration order
   decides, and the loser silently gets the wrong device. The udev symlinks in
   `scripts/gnss/99-rig-serial.rules` fix this — the GNSS rule is verified,
   the XIAO rule is deliberately left blank rather than guessed.

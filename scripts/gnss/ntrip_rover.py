@@ -103,6 +103,21 @@ def reader(ser):
             continue                      # no position yet
         with lock:
             state["gga"] = line
+            # ddmm.mmmm -> decimal degrees. The split is at 2 digits for
+            # latitude and 3 for longitude, because longitude runs to 180.
+            try:
+                la = float(f[2][:2]) + float(f[2][2:]) / 60.0
+                lo = float(f[4][:3]) + float(f[4][3:]) / 60.0
+                state["lat"] = -la if f[3] == "S" else la
+                state["lon"] = -lo if f[5] == "W" else lo
+                state["alt"] = float(f[9])
+                state["hdop"] = f[8]
+                # Field 13 is the age of the differential corrections. It
+                # is empty when nothing is arriving, which is the quickest
+                # way to tell "RTK died" from "RTK never started".
+                state["age"] = f[13] if len(f) > 13 and f[13] else None
+            except (ValueError, IndexError):
+                pass
             q, prev = f[6], state["quality"]
             state["quality"], state["sats"] = q, f[7]
             if q != prev:
@@ -264,8 +279,14 @@ def main():
                     tl = ", ".join(
                         f"{t}({RTCM.get(t, '?')})×{n}"
                         for t, n in sorted(state["types"].items()))
+                    la, lo = state.get("lat"), state.get("lon")
+                    alt, age = state.get("alt"), state.get("age")
                 print(f"[{now - state['t0']:6.1f}s] {kb:8.1f} kB RTCM | "
-                      f"fix {q} ({FIX.get(q, '?')})")
+                      f"fix {q} ({FIX.get(q, '?')}) | corr age "
+                      f"{age + ' s' if age else '--'}")
+                if la is not None:
+                    print(f"          {la:.8f}, {lo:.8f}   alt {alt:.3f} m MSL"
+                          f"   HDOP {state.get('hdop')}   {state.get('sats')} sats")
                 print(f"          {tl}")
     except KeyboardInterrupt:
         print("\ninterrupted")

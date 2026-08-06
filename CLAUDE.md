@@ -167,6 +167,60 @@ this file is the handoff. Read it fully before making changes.
     laptop over Ethernet; GPS is not involved. PPS only matters if the
     laptop clock is later disciplined to UTC (`gpsd` + `chrony`), which is
     Tier 2 / RTK territory, not SLAM.
+- **RTK GNSS — Quectel LG290P, working 2026-08-06.** Bought instead of the
+  ZED-F9P the research pass had planned; every doc that still said F9P was
+  corrected the same day. Full detail: **docs/rtk_gnss.md**.
+  - Identified from the device, not the box: `$PQTMVERNO` returns
+    `LG290P03AANR01A06S`, firmware 2025/09/18. Rover mode
+    (`PQTMCFGRCVRMODE,1`), 10 Hz (`FIXRATE,100`), **460800 8N1**
+    (`CFGUART,1,460800,8,0,1,0`) over a QinHeng CH343 (`1a86:55d3`).
+    Baud was scanned, not assumed — 460800 gave 216 checksum-valid NMEA
+    sentences, every other rate gave zero.
+  - **Six constellations, confirmed twice independently.**
+    `$PQTMCFGCNST,OK,1,1,1,1,1,1` (all slots on), and the talker IDs on the
+    wire: GP GPS, GL GLONASS, GA Galileo, GB BeiDou, GQ QZSS, GI NavIC.
+  - **Mountpoint is `MSM4_VRS` and that is structural, not taste.** Legacy
+    RTCM 3 observation messages exist only for GPS and GLONASS (1001-1004,
+    1009-1012); there is no legacy type for Galileo or BeiDou. On an
+    `RTCM3_*` mountpoint a four-constellation rover silently receives
+    nothing for half its constellations. Measured over 75 s on MSM4_VRS:
+    74 each of 1074/1084/1094/1124.
+  - **Traffic is bidirectional and that is not optional.** Every InCORS
+    mountpoint advertises `nmea=1`, and VRS synthesises observations at the
+    position you report — send no GGA upstream and there is nothing to
+    synthesise. `scripts/gnss/ntrip_rover.py` does both directions.
+  - **Reached RTK float (GGA quality 5) in 1.8 s. Has never reached fixed
+    (4).** Expected indoors. Float is visibly float: over 52 s on a
+    stationary antenna with healthy corrections (age 1.1 s, 29 sats) the
+    solution wandered 2.79 m in latitude and 2.71 m in altitude. **Only
+    quality 4 is worth georeferencing with.** Outdoor test not yet done.
+  - **InCORS is FREE** — confirmed by Matt 2026-08-06, who holds the
+    account. The sourcetable advertises `fee=Y` on every mountpoint; that
+    evidently just encodes "registration required". Do not re-raise it.
+  - **Credentials are NOT in the repo** — `~/.config/ntrip/incors.conf`,
+    mode 600. pandar-40p is public on GitHub. `.gitignore` excludes
+    `incors.conf`; only a masked template is tracked. Caster address is
+    masked in the repo too.
+  - **What RTK does NOT do: FAST-LIO2 ignores GPS entirely.** It buys
+    georeferencing and an independent, continuous drift score (today drift
+    is only measurable when a run happens to close a loop). It does not
+    improve the live trajectory.
+  - Still open: antenna not mounted (must be the highest thing on the rig —
+    the lidar is a spinning metal cylinder and will occlude it), lever arm
+    to the lidar not measured, no ROS integration, not recorded into a bag.
+    Note the u-blox ROS drivers are the **wrong** ones — this is Quectel,
+    speaking NMEA + PQTM, so `nmea_navsat_driver` is the closer fit.
+- **`/dev/ttyACM0` IS CONTESTED — new landmine 2026-08-06.** The LG290P
+  enumerates as a CH343 USB-serial and claims `/dev/ttyACM0`, which is
+  exactly what the IMU bridge uses. It took ACM0 with the XIAO unplugged.
+  With both attached, **enumeration order decides who gets it**, and the
+  loser silently talks to the wrong device — the bridge would parse NMEA as
+  IMU packets, or RTCM would be written into the IMU. The old "udev symlink
+  is a wanted nicety" note is upgraded to required.
+  `scripts/gnss/99-rig-serial.rules` pins the GNSS by serial number
+  (`5B90166916`, read from `udevadm`); the XIAO half is deliberately left
+  blank because the board was not plugged in to read its IDs, and guessing
+  them is exactly the habit this project keeps getting burned by.
 - **Cameras** — 2× ELP-USB3DGS1200P01-H120 dual-lens global shutter
   (OG02B10, 3200×1200, USB2 UVC, MJPEG-always). Mounted, NOT aimed/bonded/
   calibrated yet. Calibrate LAST, after aim is final. **Only ONE lens per
@@ -278,8 +332,13 @@ this file is the handoff. Read it fully before making changes.
 - **Launch the mapper with an ABSOLUTE config path** — relative paths
   resolve against the install tree and silently load the wrong file.
   Proof of correct load: console prints `p_pre->lidar_type 2`.
-- Rig launch: `~/Desktop/rig_launch_v2.py` (repo `launch/rig.launch.py`) =
-  hesai driver + its RViz + sensor bridge + optional `record:=true` bag.
+- Rig launch: **`ros2 launch ~/pandar-40p/launch/rig.launch.py`** = hesai
+  driver + its RViz + sensor bridge + lidar_temp + rig_status + optional
+  `record:=true` bag. Run it from the **repo** path: as of 2026-08-06 every
+  node it spawns comes from the repo, so there is one file under version
+  control instead of a Desktop copy that silently drifts.
+  `~/Desktop/rig_launch_v2.py` is kept as an identical copy for muscle
+  memory.
 - Recording protocol: hold dead still 3–5 s at start (gravity/bias init).
 - **Thermal monitoring, added 2026-08-01.** Both temperatures now record
   into every bag: `/imu/temperature` at 1 Hz and `/lidar/temperature` at
@@ -826,7 +885,10 @@ detail: docs/fastlio_setup.md and docs/imu_extrinsic.md.
    coverage rather than about establishing the number.
 9. Offline chain: GLIM (humble CUDA binaries) → HBA (Docker) → ERASOR
    dynamic removal → colorize → PINGS/Gaussian-LIC2 splats. 8 GB VRAM ⇒
-   chunk scenes. Tier 2 later: ZED-F9P RTK via Indiana InCORS NTRIP (free).
+   chunk scenes. Tier 2: **RTK is no longer 'later' — the LG290P works as of
+   2026-08-06** on free Indiana InCORS NTRIP. See the RTK entry under Hardware
+   and docs/rtk_gnss.md. Remaining: antenna mount, RTK fixed outdoors, ROS
+   integration, and recording it into a bag.
 
 ## Decisions taken 2026-08-01/02 that are not visible in the code
 
@@ -939,6 +1001,10 @@ looks wrong, re-derive it rather than trusting the prose.
   `mat_out_20260730bag_crooked.txt` (the 14° crooked-mount forensic run),
   `mat_20260801outdoor_eston.txt` and `mat_20260801outdoor_estoff.txt`
   (the `extrinsic_est_en` A/B).
+- **RTK GNSS** — `scripts/gnss/`: `gnss_probe.py` finds the port and baud by
+  scanning, `gnss_query.py` asks the receiver what it is (read-only PQTM),
+  `ntrip_rover.py` streams corrections and reports fix quality. Credentials
+  are outside the repo at `~/.config/ntrip/incors.conf`.
 - **Re-deriving anything** — `scripts/diagnostics/` covers it:
   `bag_grav.py` mount signature, `analyze_ext.py` extrinsic,
   `allan.py` IMU noise, `floorplan.py` levelling and map measurement,

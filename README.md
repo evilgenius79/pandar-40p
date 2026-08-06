@@ -36,6 +36,7 @@ STROLLER MAST (~2 m, braced)                       LAPTOP (stroller seat)
 │   (co-mounted under lidar)  │
 │ 2× ELP OG02B10 GS cameras   │────────── USB ──► colorization frames
 │ u-blox M10 GNSS             │──── via XIAO ───► /gps/fix
+│ Quectel LG290P RTK          │────── USB ───► RTK float (InCORS NTRIP)
 └─────────────────────────────┘
 12 V flooded deep-cycle ── fuse ── rig            Ubuntu 22.04 · ROS 2 Humble
   └ INA226 + ESP32-C6 monitor (hardware ALERT)     FAST-LIO2 live · GLIM offline
@@ -67,7 +68,7 @@ XIAO plugged in before launch (bridge hardcodes `/dev/ttyACM0`).
 
 ```bash
 # record a run — hold still for the first 3–5 s (gravity/bias init)
-ros2 launch launch/rig.launch.py record:=true
+ros2 launch ~/pandar-40p/launch/rig.launch.py record:=true
 
 # replay through the mapper — absolute config path is required
 ros2 launch fast_lio mapping.launch.py \
@@ -86,6 +87,7 @@ python3 scripts/diagnostics/save_map.py 0.02 ~/map.pcd
 | `hardware/`              | BOM + wiring references                                          |
 | `patches/`               | FAST-LIO2 source patches for the Hesai driver's point format     |
 | `scripts/network/`       | NIC setup, PTP master, lidar discovery                           |
+| `scripts/gnss/`          | LG290P probe/query + NTRIP rover client, udev rules             |
 | `scripts/capture/`       | rosbag2 recording helpers                                        |
 | `scripts/diagnostics/`   | rclpy topic-inspection tools + PCD export (the `ros2` CLI is unreliable on the rig laptop) |
 | `scripts/postprocess/`   | offline pipeline notes/stubs (GLIM → HBA → cleanup)              |

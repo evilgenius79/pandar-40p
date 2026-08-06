@@ -6,10 +6,14 @@ pointed at /lidar_points with the right frame), so this file no longer starts
 a second one — that was the extra-window fix.
 
 Usage:
-    ros2 launch ~/rig.launch.py
-    ros2 launch ~/rig.launch.py record:=true
+    ros2 launch ~/pandar-40p/launch/rig.launch.py
+    ros2 launch ~/pandar-40p/launch/rig.launch.py record:=true
 
-Edit the three CONFIG paths once to match your machine.
+Run it from the REPO path, not from a copy on the Desktop. Every node it
+spawns now lives in the repo, so there is one file to edit and one file
+under version control. An identical copy at ~/Desktop/rig_launch_v2.py is
+what older notes referenced; it still works, but it is a copy and copies
+drift.
 """
 import os
 from datetime import datetime
@@ -20,19 +24,28 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
-# ---------------- CONFIG: adjust these three paths once ----------------
+# ---------------- CONFIG: adjust these two paths once ----------------
 HESAI_LAUNCH = os.path.expanduser(
     "~/ros2_ws/src/HesaiLidar_ROS_2.0/launch/start.py")
-BRIDGE_SCRIPT = os.path.expanduser(
-    "~/Desktop/imu_bridge_node/imu_bridge_node.py")
 BAG_DIR = os.path.expanduser("~/bags")
-# ----------------------------------------------------------------------
+# ---------------------------------------------------------------------
 
+REPO = os.path.expanduser("~/pandar-40p")
+# All three nodes come from the repo. BRIDGE_SCRIPT used to point at
+# ~/Desktop/imu_bridge_node/ while the other two already came from here,
+# which meant the file that actually ran was not the file under version
+# control. They were byte-identical when this was changed (2026-08-06).
+BRIDGE_SCRIPT = f"{REPO}/ros2/imu_bridge_node/imu_bridge_node.py"
+LIDAR_TEMP = f"{REPO}/ros2/lidar_temp_node/lidar_temp_node.py"
+RIG_STATUS = f"{REPO}/ros2/rig_status_node/rig_status_node.py"
+
+# The IMU bridge's serial port. NOT a stable name: the LG290P GNSS module
+# enumerates as a CH343 and also claims /dev/ttyACM0, so with both plugged
+# in whichever appears first wins and the loser silently gets the wrong
+# device. Install scripts/gnss/99-rig-serial.rules and this becomes
+# /dev/imu. Until the XIAO's USB IDs are read from the board, that rule is
+# deliberately incomplete -- see docs/rtk_gnss.md section 6.
 BRIDGE_PORT = "/dev/ttyACM0"
-LIDAR_TEMP = os.path.expanduser(
-    "~/pandar-40p/ros2/lidar_temp_node/lidar_temp_node.py")
-RIG_STATUS = os.path.expanduser(
-    "~/pandar-40p/ros2/rig_status_node/rig_status_node.py")
 RECORD_TOPICS = ["/lidar_points", "/imu/data_raw", "/gps/fix", "/gps/pps",
                  "/imu/temperature", "/lidar/temperature"]
 

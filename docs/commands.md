@@ -17,8 +17,13 @@ Plug the XIAO in **before** launching — the bridge node hardcodes
 `/dev/ttyACM0` and will not find it later.
 
 ```bash
-ros2 launch ~/Desktop/rig_launch_v2.py record:=true
+ros2 launch ~/pandar-40p/launch/rig.launch.py record:=true
 ```
+
+Run it from the **repo** path. `~/Desktop/rig_launch_v2.py` is an identical
+copy that older notes referenced and it still works, but the repo file is
+the one under version control — and as of 2026-08-06 every node it spawns
+comes from the repo too, so there is only one file to edit.
 
 Hold the rig **dead still for 3–5 s** at the start; that window is what
 gravity and bias init use, and every `bag_grav.py` check reads it. Then walk
@@ -264,7 +269,37 @@ where the global `lidar_range` governs and the per-laser arrays read all
 zero *normally*. `lidar_config.py` reads the method first and says which
 block is actually in force.
 
-## 10. Git
+## 10. RTK GNSS (LG290P + InCORS)
+
+Credentials live in `~/.config/ntrip/incors.conf`, mode 600, **outside the
+repo** — this repo is public. Template: `scripts/gnss/incors.conf.example`.
+
+```bash
+# what is on the port, and at what baud? (scans, does not assume)
+python3 ~/pandar-40p/scripts/gnss/gnss_probe.py /dev/ttyACM0
+
+# ask the receiver what it is and how it is configured (read-only)
+python3 ~/pandar-40p/scripts/gnss/gnss_query.py /dev/ttyACM0 460800
+
+# list caster mountpoints
+python3 ~/pandar-40p/scripts/gnss/ntrip_rover.py --sourcetable
+
+# stream corrections into the receiver
+python3 ~/pandar-40p/scripts/gnss/ntrip_rover.py
+python3 ~/pandar-40p/scripts/gnss/ntrip_rover.py --seconds 60
+```
+
+**Watch GGA field 6**: `1` autonomous (metres) → `5` RTK float (decimetres)
+→ `4` RTK fixed (centimetres). Only `4` is worth georeferencing with. Float
+wanders metres on a stationary antenna — measured.
+
+Quality `2` (DGPS) after you stop the client is the receiver **coasting on
+stale corrections**, not a live link. Check GGA field 13, the correction
+age: empty means nothing is arriving.
+
+Full reference: `docs/rtk_gnss.md`.
+
+## 11. Git
 
 Push straight to `main` — no PRs or side branches unless asked.
 
@@ -272,7 +307,7 @@ Push straight to `main` — no PRs or side branches unless asked.
 cd ~/pandar-40p && git add -A && git commit -m "..." && git push origin main
 ```
 
-## 11. Remote access
+## 12. Remote access
 
 Not project-specific; here because it is used often. Kept out of the repo
 scripts on purpose — the helper lives at `~/.local/bin/claude-session.sh`.
