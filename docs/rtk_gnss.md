@@ -176,9 +176,19 @@ NTRIP client is running.
 - Antenna not mounted. It must be the highest thing on the rig: the
   Pandar40P is a spinning metal cylinder and mounting the antenna beside or
   below it buys occlusion and multipath, which is what defeats a fix.
-- No ROS integration. `ros-humble-ntrip-client` and `ros-humble-ublox-dgnss`
-  are in apt but not installed; note the LG290P is Quectel, so the u-blox
-  driver is the wrong one — it speaks NMEA plus Quectel PQTM, so
-  `nmea_navsat_driver` is the closer fit.
-- Not recorded into a bag. `/gps/fix` still comes from the M10 via the XIAO.
+- ~~No ROS integration.~~ **DONE 2026-08-06** — `ros2/gnss_node/gnss_node.py`
+  publishes `/gps/fix` (NavSatFix, 10 Hz) and `/gps/rtk_quality` (raw GGA
+  field 6), and `rig.launch.py` starts it. Measured 10.1 Hz.
+  No apt package was needed: `ublox-dgnss` is the wrong family (this is
+  Quectel, not u-blox) and `nmea_navsat_driver` would discard the RTK
+  quality, which is the one number that matters here.
+- ~~Not recorded into a bag.~~ **`/gps/fix` and `/gps/rtk_quality` are now in
+  `RECORD_TOPICS`.** `/gps/pps` was *removed* from that list — nothing has
+  published it since the M10 came off, and rosbag2 records a silent declared
+  topic without complaint.
+- **RTK corrections are not automatic.** `gnss_node.py` only reads. Run
+  `scripts/gnss/ntrip_rover.py` alongside it to get anything better than
+  autonomous, and remember both open the same serial port — the NTRIP client
+  writes RTCM to it while the node reads NMEA from it. That works today
+  because Linux does not lock the port, but it is worth knowing.
 - Antenna lever arm to the lidar not measured.

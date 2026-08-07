@@ -65,7 +65,7 @@ ESP32-S3. Cameras software-timestamped on arrival. GNSS = position, not timing.
 | 4 | MPU6050 | Owned | Bring-up stand-in only |
 | 5 | XIAO ESP32-S3 | Owned | USB IMU timestamping bridge, 200+ Hz |
 | 6 | 2× ELP dual-lens GS boards (OG02B10) | **On rig, not yet aimed/bonded** | One lens used per board — the boards are dual-lens for cost, not stereo. Both sustain 3200×1200 @ 15 fps; 30 fps fails on USB 2.0 isochronous bandwidth. No measurable effect on IMU timing |
-| 7 | u-blox M10 | Owned | Tier-1 GNSS (meter-level). Superseded outdoors by #13. L1-only, so it can never use the InCORS L1+L2 streams |
+| 7 | u-blox M10 | **Removed from the rig 2026-08-06** | Tier-1 GNSS (meter-level). Superseded by #13 and taken off. L1-only, so it could never use the InCORS L1+L2 streams |
 | 8 | 16-pin waterproof connector pair | Ordered | Replaces the Lemo mid-cable |
 | 9 | Jogging stroller, pneumatic tires | **In service** | Air tires were the vibration fix and it is now measured: peak 32.59 m/s² = 42 % of ±8 g, zero samples above 50 % → **isolators not needed**. Keep lidar+IMU rigidly coupled as one head (never isolate them from each other) |
 | 10 | Mast + brackets | **Built, in service** | welded, plug-AFT, ~45–47° from vertical. The "~58°" figure that circulated for a week was a crooked IMU, not the mast |

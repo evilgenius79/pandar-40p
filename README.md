@@ -35,8 +35,7 @@ STROLLER MAST (~2 m, braced)                       LAPTOP (stroller seat)
 │ ICM-42688-P ── XIAO ESP32-S3│────────── USB ──► /imu/data_raw (200 Hz)
 │   (co-mounted under lidar)  │
 │ 2× ELP OG02B10 GS cameras   │────────── USB ──► colorization frames
-│ u-blox M10 GNSS             │──── via XIAO ───► /gps/fix
-│ Quectel LG290P RTK          │────── USB ───► RTK float (InCORS NTRIP)
+│ Quectel LG290P RTK GNSS     │────── USB ──► /gps/fix (RTK, InCORS NTRIP)
 └─────────────────────────────┘
 12 V flooded deep-cycle ── fuse ── rig            Ubuntu 22.04 · ROS 2 Humble
   └ INA226 + ESP32-C6 monitor (hardware ALERT)     FAST-LIO2 live · GLIM offline
@@ -94,6 +93,7 @@ python3 scripts/diagnostics/save_map.py 0.02 ~/map.pcd
 | `firmware/imu_bridge/`   | XIAO ESP32-S3 + ICM-42688-P USB timestamping bridge (PlatformIO) |
 | `firmware/battery_monitor/` | ESP32-C6 + INA226 pack monitor with a hardware low-voltage ALERT |
 | `ros2/imu_bridge_node/`  | laptop-side serial→`sensor_msgs/Imu` publisher                   |
+| `ros2/gnss_node/`        | LG290P → `/gps/fix` + `/gps/rtk_quality`                          |
 | `ros2/lidar_temp_node/`  | polls the lidar console for die temperature → `/lidar/temperature` |
 | `ros2/rig_status_node/`  | aggregates all rig state and serves it as JSON on :8080          |
 | `ros2/config/`           | Hesai driver + FAST-LIO2 configs, `ptp4l` master config          |

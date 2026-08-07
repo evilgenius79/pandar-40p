@@ -167,6 +167,15 @@ this file is the handoff. Read it fully before making changes.
     laptop over Ethernet; GPS is not involved. PPS only matters if the
     laptop clock is later disciplined to UTC (`gpsd` + `chrony`), which is
     Tier 2 / RTK territory, not SLAM.
+- **The u-blox M10 was REMOVED from the rig 2026-08-06.** It was L1-only and
+  could never use the InCORS L1+L2 streams, so the LG290P supersedes it
+  outright. Consequences: the XIAO's D5 (GPS RX) and D4 (PPS) are now unused
+  and the XIAO is an IMU-only bridge; `/gps/fix` is published by
+  `ros2/gnss_node/` instead; and **`/gps/pps` was removed from
+  `RECORD_TOPICS`** because nothing publishes it and rosbag2 will silently
+  record a declared-but-empty topic. Verified at the source before changing
+  anything: over 8 s the XIAO emitted 1,611 `0xAA 0x55` IMU packets and zero
+  `0x56`/`0x57`.
 - **RTK GNSS — Quectel LG290P, working 2026-08-06.** Bought instead of the
   ZED-F9P the research pass had planned; every doc that still said F9P was
   corrected the same day. Full detail: **docs/rtk_gnss.md**.
@@ -205,11 +214,19 @@ this file is the handoff. Read it fully before making changes.
     georeferencing and an independent, continuous drift score (today drift
     is only measurable when a run happens to close a loop). It does not
     improve the live trajectory.
+  - **ROS integration DONE 2026-08-06**: `ros2/gnss_node/gnss_node.py`
+    publishes `/gps/fix` at 10 Hz plus `/gps/rtk_quality` (raw GGA field 6),
+    and `rig.launch.py` starts it. The separate quality topic exists because
+    `NavSatStatus` has no RTK value — fixed and float both flatten to GBAS,
+    destroying the centimetre-vs-metre distinction. Altitude is published
+    ellipsoidal (GGA field 9 + geoid separation), as `NavSatFix` requires;
+    publishing the raw MSL number would be ~35 m wrong here. Covariance is
+    approximated from HDOP and flagged `COVARIANCE_TYPE_APPROXIMATED`.
   - Still open: antenna not mounted (must be the highest thing on the rig —
     the lidar is a spinning metal cylinder and will occlude it), lever arm
-    to the lidar not measured, no ROS integration, not recorded into a bag.
-    Note the u-blox ROS drivers are the **wrong** ones — this is Quectel,
-    speaking NMEA + PQTM, so `nmea_navsat_driver` is the closer fit.
+    to the lidar not measured, RTK fixed never achieved, and corrections are
+    not automatic — `gnss_node.py` only reads, so run
+    `scripts/gnss/ntrip_rover.py` alongside it.
 - **`/dev/ttyACM0` IS CONTESTED — new landmine 2026-08-06.** The LG290P
   enumerates as a CH343 USB-serial and claims `/dev/ttyACM0`, which is
   exactly what the IMU bridge uses. It took ACM0 with the XIAO unplugged.

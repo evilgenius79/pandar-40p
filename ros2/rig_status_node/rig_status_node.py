@@ -26,11 +26,17 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from sensor_msgs.msg import Imu, NavSatFix, PointCloud2, Temperature
+from std_msgs.msg import UInt8
 
 STATE = {"started": time.time()}
 LOCK = threading.Lock()
 
 FIX = {0: "FIX", -1: "NO_FIX", 1: "SBAS", 2: "GBAS"}
+
+# Raw GGA field 6. Only 4 (RTK fixed) is centimetre-class; 5 (float) wanders
+# metres on a stationary antenna, measured 2026-08-06.
+RTK = {0: "invalid", 1: "autonomous", 2: "DGPS", 3: "PPS",
+       4: "RTK FIXED", 5: "RTK float", 6: "dead reckoning"}
 
 
 class Rate:
@@ -71,6 +77,11 @@ class RigStatus(Node):
         self.create_subscription(PointCloud2, "/lidar_points",
                                  self.on_lidar, sensor_qos)
         self.create_subscription(NavSatFix, "/gps/fix", self.on_gps, 10)
+        # NavSatStatus cannot express RTK -- fixed and float both flatten to
+        # GBAS, which is the difference between centimetres and metres. The
+        # raw GGA quality is what you actually want to see while walking.
+        self.create_subscription(UInt8, "/gps/rtk_quality",
+                                 self.on_rtk, 10)
         self.create_subscription(Temperature, "/imu/temperature",
                                  lambda m: self.temp("imu", m.temperature), 10)
         self.create_subscription(Temperature, "/lidar/temperature",
@@ -111,6 +122,12 @@ class RigStatus(Node):
     def on_lidar(self, m):
         self.r_lidar.tick()
         self.put("lidar_points", m.width * m.height)
+
+    def on_rtk(self, m):
+        with LOCK:
+            STATE["rtk_quality"] = int(m.data)
+            STATE["rtk"] = RTK.get(int(m.data), str(m.data))
+            STATE["rtk_ok"] = bool(m.data == 4)
 
     def on_gps(self, m):
         self.r_gps.tick()

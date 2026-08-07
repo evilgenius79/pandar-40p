@@ -38,6 +38,7 @@ REPO = os.path.expanduser("~/pandar-40p")
 BRIDGE_SCRIPT = f"{REPO}/ros2/imu_bridge_node/imu_bridge_node.py"
 LIDAR_TEMP = f"{REPO}/ros2/lidar_temp_node/lidar_temp_node.py"
 RIG_STATUS = f"{REPO}/ros2/rig_status_node/rig_status_node.py"
+GNSS_NODE = f"{REPO}/ros2/gnss_node/gnss_node.py"
 
 # "auto" makes the bridge resolve the XIAO by USB identity via
 # /dev/serial/by-id/. It used to be "/dev/ttyACM0", which broke the moment
@@ -47,7 +48,14 @@ RIG_STATUS = f"{REPO}/ros2/rig_status_node/rig_status_node.py"
 # Enumeration order is not a stable identifier. Do not put a ttyACM number
 # back here.
 BRIDGE_PORT = "auto"
-RECORD_TOPICS = ["/lidar_points", "/imu/data_raw", "/gps/fix", "/gps/pps",
+# /gps/pps is GONE from this list. Nothing publishes it since the M10 was
+# removed on 2026-08-06, and rosbag2 records a declared-but-silent topic
+# without complaint -- you only find out when you go looking for the data.
+# /gps/rtk_quality carries the raw GGA fix quality, which NavSatStatus
+# cannot represent (it has no RTK value, so fixed and float both flatten to
+# GBAS). Without it a bag cannot tell centimetres from metres.
+RECORD_TOPICS = ["/lidar_points", "/imu/data_raw",
+                 "/gps/fix", "/gps/rtk_quality",
                  "/imu/temperature", "/lidar/temperature"]
 
 
@@ -75,6 +83,13 @@ def generate_launch_description():
         cmd=["python3", RIG_STATUS],
         name="rig_status", output="log")
 
+    # GNSS. Replaces the M10-via-XIAO path, removed 2026-08-06. Without this
+    # node /gps/fix has no publisher at all. It does NOT stream RTK
+    # corrections -- run scripts/gnss/ntrip_rover.py alongside for that.
+    gnss = ExecuteProcess(
+        cmd=["python3", GNSS_NODE],
+        name="gnss", output="log")
+
     bag_path = os.path.join(BAG_DIR,
                             datetime.now().strftime("run_%Y%m%d_%H%M%S"))
     record = ExecuteProcess(
@@ -83,4 +98,4 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("record")))
 
     return LaunchDescription(
-        [record_arg, lidar, bridge, lidar_temp, rig_status, record])
+        [record_arg, lidar, bridge, gnss, lidar_temp, rig_status, record])
