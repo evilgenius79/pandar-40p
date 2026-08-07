@@ -167,9 +167,10 @@ this file is the handoff. Read it fully before making changes.
     laptop over Ethernet; GPS is not involved. PPS only matters if the
     laptop clock is later disciplined to UTC (`gpsd` + `chrony`), which is
     Tier 2 / RTK territory, not SLAM.
-- **The u-blox M10 was REMOVED from the rig 2026-08-06.** It was L1-only and
-  could never use the InCORS L1+L2 streams, so the LG290P supersedes it
-  outright. Consequences: the XIAO's D5 (GPS RX) and D4 (PPS) are now unused
+- **The u-blox M10 was REMOVED from the rig 2026-08-06 — as always intended.**
+  Replacing it was the *point* of buying the RTK module; nobody runs two GNSS
+  receivers, and the M10 is L1-only so it could never use the InCORS L1+L2
+  streams. Consequences: the XIAO's D5 (GPS RX) and D4 (PPS) are now unused
   and the XIAO is an IMU-only bridge; `/gps/fix` is published by
   `ros2/gnss_node/` instead; and **`/gps/pps` was removed from
   `RECORD_TOPICS`** because nothing publishes it and rosbag2 will silently

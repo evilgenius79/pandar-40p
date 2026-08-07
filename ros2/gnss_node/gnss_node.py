@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
-"""Publish the LG290P's position as ROS 2 topics.
+"""Publish the LG290P's position as ROS 2 topics, corrections included.
 
-    gnss_node.py [--port auto] [--baud 460800]
+    gnss_node.py [--port auto] [--baud 460800] [--no-ntrip]
 
 Replaces the u-blox M10 path. The M10 fed /gps/fix through the XIAO's D5
-UART; it was removed from the rig on 2026-08-06 because it is L1-only and
-could never use the InCORS L1+L2 correction streams. Without this node
-/gps/fix has no publisher at all, and rig.launch.py would happily record an
-empty topic -- silently, which is this project's recurring failure mode.
+UART and was removed on 2026-08-06: it is L1-only, so it could never use the
+InCORS L1+L2 correction streams. Replacing it was the point of buying the
+RTK module -- nobody runs two GNSS receivers.
+
+NTRIP RUNS INSIDE THIS NODE, ON PURPOSE. Corrections start with everything
+else, so `ros2 launch rig.launch.py record:=true` is the whole command and
+an RTK bag needs no second terminal.
+
+It must be one process because of the serial port. Two processes reading
+the same tty split the byte stream -- each read consumes bytes the other
+never sees -- so a separate NTRIP process would corrupt both its own GGA
+parsing and this node's NMEA. One owner, and the NTRIP thread reaches the
+receiver through a locked write.
 
 Publishes:
     /gps/fix          sensor_msgs/NavSatFix     position + covariance
     /gps/rtk_quality  std_msgs/UInt8            raw GGA field 6
+    /gps/corr_age     std_msgs/Float32          seconds since last RTCM
 
 WHY A SEPARATE QUALITY TOPIC. NavSatStatus has no RTK value -- it offers
 only NO_FIX/FIX/SBAS/GBAS. RTK fixed and RTK float both map to GBAS, so the
@@ -28,15 +38,18 @@ instead and the type becomes DIAGONAL_KNOWN.
 """
 import argparse
 import glob
-import math
 import os
 import sys
+import threading
 
 import rclpy
 import serial
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, NavSatStatus
-from std_msgs.msg import UInt8
+from std_msgs.msg import Float32, UInt8
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ntrip_client import NtripClient, load_config      # noqa: E402
 
 GNSS_BY_ID_HINT = "1a86_USB_Single_Serial"
 
@@ -92,15 +105,46 @@ def dm_to_deg(v, hemi, degdigits):
 
 
 class Lg290pNode(Node):
-    def __init__(self, port, baud):
+    def __init__(self, port, baud, ntrip_cfg_path=None):
         super().__init__("gnss")
         self.ser = serial.Serial(port, baud, timeout=0.2)
+        self.ser_lock = threading.Lock()       # NTRIP writes from its thread
         self.pub_fix = self.create_publisher(NavSatFix, "gps/fix", 10)
         self.pub_q = self.create_publisher(UInt8, "gps/rtk_quality", 10)
+        self.pub_age = self.create_publisher(Float32, "gps/corr_age", 10)
         self.gst = None            # newest (lat_sd, lon_sd, alt_sd) if sent
         self.last_q = None
+        self.gga = None
+        self.ntrip = None
         self.create_timer(0.02, self.poll)
         self.get_logger().info(f"reading {port} @ {baud}")
+
+        if ntrip_cfg_path:
+            cfg = load_config(ntrip_cfg_path)
+            if cfg:
+                self.ntrip = NtripClient(
+                    cfg,
+                    get_gga=lambda: self.gga,
+                    on_rtcm=self.write_rtcm,
+                    log=lambda lvl, m: getattr(self.get_logger(), lvl)(m))
+                self.ntrip.start()
+                self.get_logger().info(
+                    f"NTRIP enabled: {cfg['host']}:{cfg['port']}"
+                    f"/{cfg['mountpoint']}")
+            else:
+                # Not an error. The rig must still record position with no
+                # credentials and no internet -- it just stays autonomous.
+                self.get_logger().warning(
+                    f"no usable NTRIP config at {ntrip_cfg_path}; "
+                    "running WITHOUT corrections (autonomous, metre-class)")
+
+    def write_rtcm(self, data):
+        """Called from the NTRIP thread. Must not raise into it."""
+        try:
+            with self.ser_lock:
+                self.ser.write(data)
+        except (serial.SerialException, OSError) as exc:
+            self.get_logger().error(f"RTCM write failed: {exc}")
 
     def poll(self):
         for _ in range(40):                    # drain without blocking spin
@@ -117,6 +161,7 @@ class Lg290pNode(Node):
             if line[3:6] == "GST":
                 self.on_gst(line)
             elif line[3:6] == "GGA":
+                self.gga = line          # what NTRIP sends upstream
                 self.on_gga(line)
 
     def on_gst(self, line):
@@ -179,15 +224,24 @@ class Lg290pNode(Node):
 
         self.pub_fix.publish(m)
         self.pub_q.publish(UInt8(data=q))
+        if self.ntrip:
+            age = self.ntrip.age()
+            # -1 distinguishes "no RTCM has ever arrived" from "it is fresh".
+            self.pub_age.publish(Float32(data=-1.0 if age is None else age))
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", default="auto")
     ap.add_argument("--baud", type=int, default=460800)
+    ap.add_argument("--ntrip-config", default="~/.config/ntrip/incors.conf",
+                    help="NTRIP caster config; corrections are ON by default")
+    ap.add_argument("--no-ntrip", action="store_true",
+                    help="read only, do not stream corrections")
     a = ap.parse_args()
     rclpy.init()
-    node = Lg290pNode(resolve_port(a.port), a.baud)
+    node = Lg290pNode(resolve_port(a.port), a.baud,
+                      None if a.no_ntrip else a.ntrip_config)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -195,6 +249,9 @@ def main():
     except Exception as exc:                          # noqa: BLE001
         if type(exc).__name__ != "ExternalShutdownException":
             raise
+    finally:
+        if node.ntrip:
+            node.ntrip.stop()
 
 
 if __name__ == "__main__":

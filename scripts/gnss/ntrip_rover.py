@@ -36,6 +36,13 @@ import time
 
 import serial
 
+# Protocol lives in ros2/gnss_node/ntrip_client.py so the live rig path and
+# this bench tool cannot drift apart. This file keeps its own session loop
+# only because it reports verbosely and runs bounded, which the node must not.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "ros2", "gnss_node"))
+from ntrip_client import rtcm_frames, load_config as _shared_load  # noqa: E402
+
 # The LG290P sits behind a QinHeng CH343 (1a86:55d3). That VID:PID is a
 # generic USB-serial chip, so /dev/serial/by-id/ -- which appends the board
 # serial -- is what actually identifies it. Verified on this rig:
@@ -291,7 +298,7 @@ def main():
 
             if pending:
                 consumed = 0
-                for mtype, flen in rtcm_types(pending):
+                for mtype, flen in rtcm_frames(pending):
                     with lock:
                         state["types"][mtype] = state["types"].get(mtype, 0) + 1
                     consumed += flen
