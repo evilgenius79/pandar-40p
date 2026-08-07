@@ -223,11 +223,13 @@ this file is the handoff. Read it fully before making changes.
     ellipsoidal (GGA field 9 + geoid separation), as `NavSatFix` requires;
     publishing the raw MSL number would be ~35 m wrong here. Covariance is
     approximated from HDOP and flagged `COVARIANCE_TYPE_APPROXIMATED`.
-  - Still open: antenna not mounted (must be the highest thing on the rig —
-    the lidar is a spinning metal cylinder and will occlude it), lever arm
-    to the lidar not measured, RTK fixed never achieved, and corrections are
-    not automatic — `gnss_node.py` only reads, so run
-    `scripts/gnss/ntrip_rover.py` alongside it.
+  - **PARKED 2026-08-06 pending a new antenna from Amazon** (Matt's call).
+    Everything software-side is done and verified; the full config audit
+    found zero problems; the remaining suspect is phase quality at the
+    antenna. The new antenna also tests the last hypothesis by replacement.
+    When it arrives: mount it as the highest thing on the rig, run
+    `gnss_monitor.py`, look for quality 4. Still open afterwards: lever arm
+    to the lidar, and the placement test if the new antenna also floats.
 - **`/dev/ttyACM0` IS CONTESTED — new landmine 2026-08-06.** The LG290P
   enumerates as a CH343 USB-serial and claims `/dev/ttyACM0`, which is
   exactly what the IMU bridge uses. It took ACM0 with the XIAO unplugged.

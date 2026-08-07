@@ -277,7 +277,23 @@ where the global `lidar_range` governs and the per-laser arrays read all
 zero *normally*. `lidar_config.py` reads the method first and says which
 block is actually in force.
 
-## 10. RTK GNSS (LG290P + InCORS)
+## 10. Camera aiming (next-step 5)
+
+Live view of both cameras with crosshairs and thirds grids, served over
+HTTP — open it **on your phone over Tailscale** while your hands are on
+the camera:
+
+```bash
+python3 ~/pandar-40p/scripts/cameras/aim_server.py
+# then on the phone:  http://100.117.193.108:8081
+```
+
+Runs 2560x720@30 for aiming; `--full-res` switches to 3200x1200@15, the
+recording configuration. Do not run it while recording a bag — same USB
+2.0 budget. Aim targets: ±30–35° splay, 10–15° up-pitch, one lens per
+board (the L/R labels mark the halves; pick the keeper per board).
+
+## 11. RTK GNSS (LG290P + InCORS)
 
 Credentials live in `~/.config/ntrip/incors.conf`, mode 600, **outside the
 repo** — this repo is public. Template: `scripts/gnss/incors.conf.example`.
@@ -320,7 +336,7 @@ as the rig, since two processes reading one tty split the byte stream.
 
 Full reference: `docs/rtk_gnss.md`.
 
-## 11. Git
+## 12. Git
 
 Push straight to `main` — no PRs or side branches unless asked.
 
@@ -328,7 +344,7 @@ Push straight to `main` — no PRs or side branches unless asked.
 cd ~/pandar-40p && git add -A && git commit -m "..." && git push origin main
 ```
 
-## 12. Remote access
+## 13. Remote access
 
 Not project-specific; here because it is used often. Kept out of the repo
 scripts on purpose — the helper lives at `~/.local/bin/claude-session.sh`.
