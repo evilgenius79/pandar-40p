@@ -213,33 +213,65 @@ L1 C/A / L2C / L5-Q, GLONASS 1/3 = G1/G2, Galileo 7/2 = E1/E5b, BeiDou
 have no corrections, so they do not help RTK — which is why the overall
 median flatters the situation.
 
-**Ground plane — size it for L2, not L1.** A ground plane suppresses
-reflections arriving from below, and its effectiveness scales with
-wavelength. The second frequencies are the *longer* wavelengths, which is
-awkward because they are also the ones RTK is short of here:
+**Ground plane: TRIED 2026-08-06, NO EFFECT.** Same 45 s averaging window
+before and after, correction-carrying bands:
 
-| signal | frequency | wavelength |
+| band | before | after |
 |---|---|---|
-| GPS L1 / BDS B1I | 1575 / 1561 MHz | 19.0 / 19.2 cm |
-| **GPS L2** | **1227.60 MHz** | **24.4 cm** |
-| **GLONASS G2** | **~1246 MHz** | **24.1 cm** |
+| GPS L1 C/A | 42 | 44 |
+| **GPS L2C** | **36** | **35** |
+| GLONASS G2 | 35 | 37 |
+| Galileo E5b | 41 | 34 |
+| BeiDou B1I | 34 | 38 |
 
-Rule of thumb: diameter ≥ 1 wavelength is good, ≥ λ/2 is the minimum worth
-bothering with. So **25–30 cm or larger**, not the 10–15 cm figure an earlier
-version of this file gave — that is sized for L1, the band already fine, and
-would do comparatively little for L2. A pizza pan, cake tin lid or baking
-sheet is the right order of size.
+Scatter of a few dB in both directions, target band slightly down, and the
+two runs are 10 minutes apart so constellation geometry moved. No effect.
 
-Requirements: continuous conductor (foil over cardboard is fine if unbroken),
-antenna centred and sitting directly on it, flat and horizontal. A magnetic
-mount antenna is a hint the design expects a car roof — i.e. a very large
-ground plane — which would explain weak L2 when it sits on nothing.
+**And the reasoning behind it was wrong.** The theory was that a weak second
+frequency meant poor antenna performance at longer wavelengths. But **GPS
+L5-Q is at 1176 MHz — below L2's 1227 MHz — and reads 48 median, 53 best,
+the strongest band on the rig.** If the antenna were poor at low
+frequencies, L5 would be weak too. It is the opposite. L2C reads ~35 because
+L2C is intrinsically weaker: lower transmit power than L5, and only newer
+GPS satellites broadcast it at all (7 of 11 GPS satellites here). That is
+normal, not a fault.
 
-**Still reasoning from antenna behaviour, not measured on this rig.**
-Baseline before the experiment, 45 s averaged, correction-carrying bands
-only: GPS L1 42 / L2C 36, GLONASS G1 39 / G2 35, Galileo E1 38 / E5b 41,
-BeiDou B1I 34. Compare against these with
-`gnss_monitor.py --interval 45 --once`.
+**BeiDou contributes nothing to RTK on this network.** B2I is enabled in the
+signal mask and never appears in tracking, because BDS-3 satellites do not
+broadcast it — they use B2a/B2b. InCORS `1124` carries B1I+B2I, so there is
+no usable second frequency: 8 BeiDou satellites, 0 dual-frequency.
+
+## 8. What is left, and the decisive test
+
+Everything checkable has been checked and is correct:
+
+| | |
+|---|---|
+| corrections | VRS base at **baseline 0.0 m**, all four MSM4 types, age ~1.0 s |
+| receiver config | rover, `DiffMode` auto, all signal masks default, RTCM3 in on all UARTs |
+| satellites | 31 tracked, **22 dual-frequency** (GPS 7, GLONASS 7, Galileo 8), HDOP 0.40–0.49 |
+| antenna | genuinely multi-band, excellent at low frequency (L5 48 dBHz) |
+| dwell time | 7 minutes — ruled out |
+| ground plane | no effect |
+
+RTK typically fixes with 6–8 dual-frequency satellites. With 22 and a
+zero-baseline VRS, a receiver in a clean environment fixes in seconds.
+
+What remains is what C/N0 cannot show: **multipath, or the antenna's
+phase-centre stability.** Integers are resolved from carrier phase, and a
+signal can arrive strong but phase-corrupted by reflections off a wall or
+roof. A residential yard beside a house is a hard environment for a fix —
+strong signals, dirty phase.
+
+**Decisive test — placement, not equipment.** Put the antenna where no
+vertical structure is nearby: middle of the yard away from the house, or out
+at the sidewalk. If it fixes there, the cause is multipath and the answer is
+where the antenna rides on the mast. If it still will not fix in the open
+with 22 dual-frequency satellites and perfect corrections, the antenna is
+not survey-grade and no placement will save it.
+
+Note this may matter less than it appears: the rig walks sidewalks, away
+from the house, which is a better environment than where these tests were run.
 
 **Corrections age (GGA field 13) is the fastest diagnostic.** Empty means no
 RTCM is arriving at all; ~1 s means the link is healthy. After the client
