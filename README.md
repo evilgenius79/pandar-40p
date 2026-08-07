@@ -63,7 +63,9 @@ Full console reference: [docs/lidar_console.md](docs/lidar_console.md).
 
 Workspace built per [docs/fastlio_setup.md](docs/fastlio_setup.md) — the driver
 config and two small FAST-LIO2 source patches there are **required**, not optional.
-XIAO plugged in before launch (bridge hardcodes `/dev/ttyACM0`).
+XIAO plugged in before launch — the bridge opens its port once and does not
+rescan. It resolves the XIAO by USB identity via `/dev/serial/by-id/`, not by
+`ttyACM` number: the LG290P GNSS competes for those and won on this machine.
 
 ```bash
 # record a run — hold still for the first 3–5 s (gravity/bias init)

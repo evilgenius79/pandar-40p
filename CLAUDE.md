@@ -284,8 +284,13 @@ this file is the handoff. Read it fully before making changes.
     to *that*, sharing its single 480 Mb/s upstream exactly as now. The
     only real fixes are one camera per root port with no hub between, or
     living at 15 fps — which is ample.
-- Bridge serial: XIAO must be plugged in BEFORE launch — bridge node
-  hardcodes `/dev/ttyACM0`. udev symlink is a wanted nicety.
+- Bridge serial: XIAO must be plugged in BEFORE launch — the bridge opens
+  its port once and does not rescan. It **no longer hardcodes
+  `/dev/ttyACM0`**; since 2026-08-06 it resolves the XIAO by USB identity
+  through `/dev/serial/by-id/`, because the LG290P GNSS enumerates as a
+  CH343 and takes `ttyACM0` when both are plugged in. The udev symlink
+  (`scripts/gnss/99-rig-serial.rules`) is now a convenience rather than the
+  fix, since by-id resolution needs no root.
 
 ## Coordinate frames (hard-won, do not re-derive casually)
 
