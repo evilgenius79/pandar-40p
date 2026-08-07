@@ -241,7 +241,51 @@ signal mask and never appears in tracking, because BDS-3 satellites do not
 broadcast it — they use B2a/B2b. InCORS `1124` carries B1I+B2I, so there is
 no usable second frequency: 8 BeiDou satellites, 0 dual-frequency.
 
-## 8. What is left, and the decisive test
+## 8. Full configuration audit — 2026-08-06, no problems found
+
+Matt asked for every setting to be double-checked. Every readable PQTM
+config was queried (read-only) and checked against the protocol spec v1.0:
+
+| setting | value | verdict |
+|---|---|---|
+| firmware | `LG290P03AANR01A06S` 2025/09/18 | current |
+| receiver mode | 1 = rover | correct |
+| `PQTMCFGRTK` | DiffMode 1 (auto), RelMode 1 (absolute), `120` | correct; see note |
+| constellations | all six enabled | correct |
+| signal masks | `07,03,0F,3F,0F,01` | **exact spec defaults** |
+| GPS satellite mask | `FFFFFFFF` | spec default |
+| GLONASS satellite mask | `00003FFF` | spec default (14 bits IS the full range) |
+| BeiDou satellite mask | `BFFCBFFF,1C003FFF` | spec default |
+| Galileo satellite mask | `77D4DFFE,0000000B` | differs from the *2024* spec default `67967FDF`; masks encode satellite health and the firmware is a year newer. 8 Galileo tracked dual-frequency, so nothing is lost |
+| fix rate | 100 ms = 10 Hz | correct |
+| UART1 | 460800 8N1, no flow control | correct |
+| protocols, all 3 UARTs | `00000007` in/out = NMEA+RTCM3 | correct |
+| survey-in | off | correct for a rover |
+| geofence, odometer | off / off | inert |
+| NMEA rates | GGA/RMC/GSV/GSA/GLL/VTG at 1 | fine |
+
+Notes from the audit:
+
+- **The undocumented third field in `PQTMCFGRTK` reads `120`.** The v1.0
+  spec defines only DiffMode and RelMode; 120 is almost certainly the
+  differential-age limit in seconds (a standard concept, and 120 s is a
+  common default). Corrections here age ~1 s, so it is irrelevant either
+  way. Flagged as inferred, not documented.
+- **`GST` output is disabled (rate 0).** Not an RTK factor at all, but
+  enabling it would give `gnss_node` real 1-sigma errors instead of the
+  HDOP-derived approximation (`COVARIANCE_TYPE_DIAGONAL_KNOWN` instead of
+  `APPROXIMATED`). It is a write (`PQTMCFGMSGRATE,W,GST,1` then
+  `PQTMSAVEPAR`), so it has not been done — all probing so far has been
+  read-only by policy.
+- `PQTMEPE`/`PQTMPL` return `ERROR,3` as queries — they are output
+  messages, enabled via MSGRATE, not pollable. Not a fault.
+
+**Conclusion: there is no configuration problem.** The receiver is set up
+exactly as a multi-band RTK rover should be, mostly at factory defaults,
+and nothing in it explains float-not-fixed. That strengthens the remaining
+hypothesis — phase quality (multipath), which no configuration can fix.
+
+## 9. What is left, and the decisive test
 
 Everything checkable has been checked and is correct:
 
