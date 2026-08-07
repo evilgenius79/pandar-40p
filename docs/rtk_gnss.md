@@ -173,9 +173,30 @@ same rig, same caster, same config:
 | fix | 2, stuck | 5 float | 5 float |
 
 A 13 dB L1→L2 gap is an antenna characteristic, not sky view — a proper
-dual-band antenna runs 3–6 dB. Closing it to 4 dB moved the solution from
-"cannot converge" to "clearly converging". **Neither has yet produced a fix
-(quality 4).**
+dual-band antenna runs 3–6 dB. Closing it to 4 dB was a large, real
+improvement. **It still does not fix.**
+
+**A 7-minute run settles it: dwell time is not the answer.** 270.8 kB of
+RTCM, corrections healthy the whole way, and the solution never left float.
+It does not converge — it *oscillates*:
+
+| | |
+|---|---|
+| horizontal drift, first quarter | 0.539 m |
+| horizontal drift, last quarter | 0.303 m |
+| altitude range | 300.001 → 301.178 m, ~1.2 m of wander |
+
+Altitude fell then rose again, which a converging solution does not do. An
+earlier 168 s sample looked like convergence and was written up that way;
+that was one slow swing of an oscillation, and the longer run corrects it.
+With adequate signal RTK fixes in seconds to a couple of minutes, so waiting
+longer is not a strategy.
+
+What remains is the second frequency on the correction-carrying bands:
+**GPS L2C 37, Galileo E5b 34, GLONASS G2 32 dBHz** — all at or below
+marginal, and those are exactly what the integer search has to resolve
+against. The overall median of 38 flatters this, because it is lifted by
+bands with no corrections at all (GPS L5-Q reads 49).
 
 `scripts/gnss/gnss_monitor.py` exists for exactly this: it refreshes every
 few seconds with C/N0 split by band, flags which bands the InCORS
