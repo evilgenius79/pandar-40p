@@ -284,6 +284,10 @@ python3 ~/pandar-40p/scripts/gnss/gnss_query.py /dev/ttyACM0 460800
 # list caster mountpoints
 python3 ~/pandar-40p/scripts/gnss/ntrip_rover.py --sourcetable
 
+# live per-band C/N0 while aiming the antenna (runs NTRIP itself)
+python3 ~/pandar-40p/scripts/gnss/gnss_monitor.py
+python3 ~/pandar-40p/scripts/gnss/gnss_monitor.py --once
+
 # stream corrections into the receiver
 python3 ~/pandar-40p/scripts/gnss/ntrip_rover.py
 python3 ~/pandar-40p/scripts/gnss/ntrip_rover.py --seconds 60
@@ -296,6 +300,15 @@ wanders metres on a stationary antenna — measured.
 Quality `2` (DGPS) after you stop the client is the receiver **coasting on
 stale corrections**, not a live link. Check GGA field 13, the correction
 age: empty means nothing is arriving.
+
+**Watch the `GPS L2C` row, not the fix quality.** RTK needs both
+frequencies of a pair and the second is always weaker, so a good overall
+median can hide an L2 that will never fix. Below 35 dBHz, move the antenna
+rather than waiting.
+
+Note the rig launch already runs NTRIP inside `gnss_node`, so these scripts
+are for bench work and antenna placement — do not run them at the same time
+as the rig, since two processes reading one tty split the byte stream.
 
 Full reference: `docs/rtk_gnss.md`.
 

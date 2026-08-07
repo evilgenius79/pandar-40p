@@ -157,6 +157,46 @@ already been eliminated by measurement — the VRS base decoded to **baseline
 the antenna was genuinely multi-band. Carrier phase just cannot resolve on
 weak signals.
 
+**The band that decides RTK is the SECOND frequency, not the overall
+median.** RTK resolves integer ambiguities using both frequencies of a pair,
+and the second is always weaker. A healthy-looking overall figure can hide an
+L2 that cannot fix. Measured across three antenna positions on 2026-08-06,
+same rig, same caster, same config:
+
+| | poor | better | best so far |
+|---|---|---|---|
+| GPS L1 C/A median | 34 | 41 | 41 |
+| **GPS L2C median** | **21** | **37** | **37** |
+| L1→L2 gap | **13 dB** | **4 dB** | 4 dB |
+| horizontal wander | 2.79 m | — | **0.08 m** in the last minute |
+| altitude drift | ~7 m/min | — | 0.35 m/min |
+| fix | 2, stuck | 5 float | 5 float |
+
+A 13 dB L1→L2 gap is an antenna characteristic, not sky view — a proper
+dual-band antenna runs 3–6 dB. Closing it to 4 dB moved the solution from
+"cannot converge" to "clearly converging". **Neither has yet produced a fix
+(quality 4).**
+
+`scripts/gnss/gnss_monitor.py` exists for exactly this: it refreshes every
+few seconds with C/N0 split by band, flags which bands the InCORS
+corrections actually cover, and runs NTRIP itself so RTK can engage while
+you move the antenna. Watch the `GPS L2C` row, not the fix quality:
+
+    >= 40 dBHz   should fix within a minute or two
+    35-40        float, may fix eventually
+    < 35         float forever -- move the antenna, do not wait
+
+Signal IDs are from the Quectel protocol spec v1.0 Table 8: GPS 1/6/8 =
+L1 C/A / L2C / L5-Q, GLONASS 1/3 = G1/G2, Galileo 7/2 = E1/E5b, BeiDou
+1/B = B1I/B2I. Bands outside those pairs (L5, E6, B2a, B3I) are tracked but
+have no corrections, so they do not help RTK — which is why the overall
+median flatters the situation.
+
+**Untested idea if float persists:** a ground plane under the antenna, a
+metal disc 10–15 cm across. It suppresses reflections from below and lifts
+the second frequency disproportionately. This is reasoning from how patch
+antennas behave, not something measured on this rig.
+
 **Corrections age (GGA field 13) is the fastest diagnostic.** Empty means no
 RTCM is arriving at all; ~1 s means the link is healthy. After the client
 stops, the receiver coasts on aging corrections and reports quality 2
