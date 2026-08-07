@@ -139,6 +139,24 @@ Sanity check on the absolute value: autonomous read 290.580 m before
 corrections, RTK float reads ~300 m, and Rushville sits near 300 m. The
 corrections moved altitude about 10 m toward the believable number.
 
+**Signal strength is what decides whether RTK engages at all.** Measured
+twice on 2026-08-06, same rig, same caster, same config, antenna moved:
+
+| | poor placement | better placement |
+|---|---|---|
+| median C/N0 | 29 dBHz | **38 dBHz** |
+| satellites ≥ 40 dBHz | 3 | **14** |
+| corr age | **EMPTY** | 1.1 s |
+| fix quality | 2 (DGPS), stuck | **5 (RTK float) in 7.3 s** |
+
+The first case is the confusing one: 40 kB of RTCM arrived and was written to
+the receiver, and the receiver simply did not use it. Everything else had
+already been eliminated by measurement — the VRS base decoded to **baseline
+0.0 m**, all four MSM4 types were arriving, `PQTMCFGRTK` read `DiffMode=1`
+(auto), `PQTMCFGPROT` read `00000007` (NMEA+RTCM3 in) on all three UARTs, and
+the antenna was genuinely multi-band. Carrier phase just cannot resolve on
+weak signals.
+
 **Corrections age (GGA field 13) is the fastest diagnostic.** Empty means no
 RTCM is arriving at all; ~1 s means the link is healthy. After the client
 stops, the receiver coasts on aging corrections and reports quality 2
