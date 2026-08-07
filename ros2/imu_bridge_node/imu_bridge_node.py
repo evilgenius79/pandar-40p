@@ -7,15 +7,57 @@ Demuxes three packet types from one USB-CDC stream:
                              (RMC parsed for validity flag)
   0xAA 0x57 (16 B fixed)  -> sensor_msgs/TimeReference on /gps/pps
 
-Run:  python3 imu_bridge_node.py --port /dev/ttyACM0
-Deps: pyserial, rclpy (source ROS 2 Humble first).
+Run:  python3 imu_bridge_node.py            # finds the XIAO by USB identity
+      python3 imu_bridge_node.py --port /dev/ttyACM1
+
+DO NOT hardcode /dev/ttyACM0 again. The LG290P GNSS module enumerates as a
+CH343 USB-serial and competes for the same names: on 2026-08-06 with both
+plugged in, the GNSS took ttyACM0 and the XIAO took ttyACM1, so the old
+default pointed straight at the wrong device. It fails *silently* -- NMEA
+text does not contain the 0xAA sync byte, so the bridge just publishes
+nothing and looks idle.
+
+Default is now `auto`, which resolves by USB identity via
+/dev/serial/by-id/ and needs no udev rule or root.
 """
 import argparse
+import glob
+import os
 import struct
+import sys
 import serial
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus, TimeReference, Temperature
+
+# The XIAO ESP32-S3 presents Espressif's USB JTAG/serial device. 303a:1001 is
+# shared by many ESP32-S3 boards, so /dev/serial/by-id/ -- which appends the
+# per-board serial number -- is what actually disambiguates. Verified on this
+# rig: usb-Espressif_USB_JTAG_serial_debug_unit_D8:3B:DA:45:4D:B4-if00
+XIAO_BY_ID_HINT = "Espressif_USB_JTAG"
+
+
+def resolve_port(requested):
+    """Find the XIAO's tty, preferring stable names over enumeration order.
+
+    Order: an explicit --port, then the /dev/imu udev symlink if installed,
+    then USB identity via /dev/serial/by-id/. Never falls back to a bare
+    ttyACM number -- that is the bug this function exists to prevent.
+    """
+    if requested and requested != "auto":
+        return requested
+    if os.path.exists("/dev/imu"):
+        return "/dev/imu"
+    matches = [p for p in glob.glob("/dev/serial/by-id/*")
+               if XIAO_BY_ID_HINT in p]
+    if len(matches) == 1:
+        return os.path.realpath(matches[0])
+    if len(matches) > 1:
+        sys.exit(f"more than one XIAO-like device: {matches}\n"
+                 "pass --port explicitly")
+    sys.exit("no XIAO found in /dev/serial/by-id/. Is it plugged in?\n"
+             "Available: " + ", ".join(glob.glob("/dev/serial/by-id/*") or
+                                       ["(none)"]))
 
 ACCEL_LSB_PER_G = 4096.0     # must match firmware config (±8 g)
 GYRO_LSB_PER_DPS = 32.8      # must match firmware config (±1000 dps)
@@ -207,11 +249,13 @@ class SensorBridge(Node):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", default="/dev/ttyACM0")
+    ap.add_argument("--port", default="auto",
+                    help="serial port, or 'auto' to find the XIAO by USB id")
     ap.add_argument("--baud", type=int, default=115200)
     args = ap.parse_args()
+    port = resolve_port(args.port)
     rclpy.init()
-    node = SensorBridge(args.port, args.baud)
+    node = SensorBridge(port, args.baud)
     try:
         rclpy.spin(node)
     finally:

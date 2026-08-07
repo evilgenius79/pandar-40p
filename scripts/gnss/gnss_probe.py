@@ -12,7 +12,11 @@ import sys
 import time
 import serial
 
-PORT = sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyACM0"
+import glob, os
+# Resolve by USB identity: /dev/ttyACM0 is contested with the XIAO.
+_by_id = [q for q in glob.glob("/dev/serial/by-id/*") if "1a86_USB_Single_Serial" in q]
+_default = os.path.realpath(_by_id[0]) if len(_by_id) == 1 else "/dev/ttyACM0"
+PORT = sys.argv[1] if len(sys.argv) > 1 else _default
 RATES = [460800, 115200, 9600, 921600, 230400, 38400, 57600, 19200]
 
 TALKER = {

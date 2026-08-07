@@ -147,12 +147,25 @@ NTRIP client is running.
 
 ## 6. Two things that will bite
 
-- **`/dev/ttyACM0` is now contested.** The LG290P enumerates as a CH343 and
-  takes `ttyACM0`; the IMU bridge *hardcodes* `ttyACM0`
-  (`launch/rig.launch.py:48`). With both plugged in, enumeration order
-  decides, and the loser silently gets the wrong device. The udev symlinks in
-  `scripts/gnss/99-rig-serial.rules` fix this — the GNSS rule is verified,
-  the XIAO rule is deliberately left blank rather than guessed.
+- **`/dev/ttyACM0` is contested — CONFIRMED LIVE 2026-08-06 and FIXED.**
+  With both devices plugged in, the GNSS took `ttyACM0` and the XIAO took
+  `ttyACM1`. The bridge's hardcoded `/dev/ttyACM0` therefore pointed at the
+  GNSS, and it fails **silently**: NMEA text contains no `0xAA` sync byte, so
+  the bridge publishes nothing and merely looks idle.
+
+  Both the bridge and the NTRIP client now resolve their port through
+  `/dev/serial/by-id/`, which encodes USB identity and needs no root:
+
+  | device | by-id | resolves to |
+  |---|---|---|
+  | LG290P | `usb-1a86_USB_Single_Serial_5B90166916-if00` | `/dev/ttyACM0` |
+  | XIAO | `usb-Espressif_USB_JTAG_serial_debug_unit_D8:3B:DA:45:4D:B4-if00` | `/dev/ttyACM1` |
+
+  Verified after the change: the bridge opened `/dev/ttyACM1` and published
+  `/imu/data_raw` at **200.2 Hz**. `scripts/gnss/99-rig-serial.rules` is now
+  complete (the XIAO's IDs were read with `udevadm`, not guessed) and gives
+  the prettier `/dev/imu` and `/dev/gnss`, but it is a convenience — the
+  by-id resolution works without it.
 - **NTRIP needs live internet on the stroller.** Corrections stream
   continuously while walking, so outdoor runs now need a phone hotspot. The
   rig has recorded entirely offline until now.

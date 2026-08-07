@@ -27,6 +27,7 @@ integers resolve. 4 is centimetre-class; 5 is decimetre.
 """
 import argparse
 import base64
+import glob
 import os
 import socket
 import sys
@@ -34,6 +35,35 @@ import threading
 import time
 
 import serial
+
+# The LG290P sits behind a QinHeng CH343 (1a86:55d3). That VID:PID is a
+# generic USB-serial chip, so /dev/serial/by-id/ -- which appends the board
+# serial -- is what actually identifies it. Verified on this rig:
+# usb-1a86_USB_Single_Serial_5B90166916-if00
+GNSS_BY_ID_HINT = "1a86_USB_Single_Serial"
+
+
+def resolve_port(requested):
+    """Resolve the GNSS tty by identity, not by enumeration order.
+
+    /dev/ttyACM0 is contested: the XIAO IMU bridge competes for the same
+    names, and on 2026-08-06 the two swapped depending on plug order. Writing
+    RTCM into the IMU bridge would be a bad day.
+    """
+    if requested and requested != "auto":
+        return requested
+    if os.path.exists("/dev/gnss"):
+        return "/dev/gnss"
+    matches = [p for p in glob.glob("/dev/serial/by-id/*")
+               if GNSS_BY_ID_HINT in p]
+    if len(matches) == 1:
+        return os.path.realpath(matches[0])
+    if len(matches) > 1:
+        sys.exit(f"more than one CH343-like device: {matches}\n"
+                 "pass --port explicitly")
+    sys.exit("no GNSS found in /dev/serial/by-id/. Is it plugged in?\n"
+             "Available: " + ", ".join(glob.glob("/dev/serial/by-id/*") or
+                                       ["(none)"]))
 
 FIX = {"0": "invalid", "1": "autonomous", "2": "DGPS", "3": "PPS",
        "4": "RTK FIXED", "5": "RTK float", "6": "dead reckoning"}
@@ -173,7 +203,8 @@ def sourcetable(cfg):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="~/.config/ntrip/incors.conf")
-    ap.add_argument("--port", default="/dev/ttyACM0")
+    ap.add_argument("--port", default="auto",
+                    help="serial port, or 'auto' to find the LG290P by USB id")
     ap.add_argument("--baud", type=int, default=460800)
     ap.add_argument("--gga-interval", type=float, default=5.0,
                     help="seconds between GGA reports upstream")
@@ -189,12 +220,13 @@ def main():
         sourcetable(cfg)
         return
 
-    ser = serial.Serial(a.port, a.baud, timeout=0.5)
+    port = resolve_port(a.port)
+    ser = serial.Serial(port, a.baud, timeout=0.5)
     threading.Thread(target=reader, args=(ser,), daemon=True).start()
 
     # The caster will not stream until it has a position, so wait for the
     # receiver's own fix before opening the connection.
-    print(f"waiting for a GGA from {a.port} @ {a.baud} ...")
+    print(f"waiting for a GGA from {port} @ {a.baud} ...")
     for _ in range(150):
         with lock:
             if state["gga"]:

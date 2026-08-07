@@ -39,13 +39,14 @@ BRIDGE_SCRIPT = f"{REPO}/ros2/imu_bridge_node/imu_bridge_node.py"
 LIDAR_TEMP = f"{REPO}/ros2/lidar_temp_node/lidar_temp_node.py"
 RIG_STATUS = f"{REPO}/ros2/rig_status_node/rig_status_node.py"
 
-# The IMU bridge's serial port. NOT a stable name: the LG290P GNSS module
-# enumerates as a CH343 and also claims /dev/ttyACM0, so with both plugged
-# in whichever appears first wins and the loser silently gets the wrong
-# device. Install scripts/gnss/99-rig-serial.rules and this becomes
-# /dev/imu. Until the XIAO's USB IDs are read from the board, that rule is
-# deliberately incomplete -- see docs/rtk_gnss.md section 6.
-BRIDGE_PORT = "/dev/ttyACM0"
+# "auto" makes the bridge resolve the XIAO by USB identity via
+# /dev/serial/by-id/. It used to be "/dev/ttyACM0", which broke the moment
+# the LG290P arrived: with both plugged in on 2026-08-06 the GNSS took
+# ttyACM0 and the XIAO took ttyACM1, so the bridge opened the GNSS and
+# published nothing -- silently, because NMEA contains no 0xAA sync byte.
+# Enumeration order is not a stable identifier. Do not put a ttyACM number
+# back here.
+BRIDGE_PORT = "auto"
 RECORD_TOPICS = ["/lidar_points", "/imu/data_raw", "/gps/fix", "/gps/pps",
                  "/imu/temperature", "/lidar/temperature"]
 

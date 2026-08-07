@@ -18,11 +18,14 @@
 # u-blox... no: Quectel LG290P behind a CH343 bridge. Verified by udevadm.
 SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", ATTRS{serial}=="5B90166916", SYMLINK+="gnss", MODE="0660", GROUP="dialout"
 
-# XIAO ESP32-S3 (IMU bridge). NOT YET FILLED IN -- the board was unplugged
-# when this file was written, so its idVendor/idProduct/serial have not been
-# read from the device and MUST NOT be guessed. With it plugged in:
-#
-#     udevadm info -a -n /dev/ttyACM0 | grep -E 'ATTRS\{(idVendor|idProduct|serial)\}' | head -3
-#
-# then uncomment and fill:
-# SUBSYSTEM=="tty", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="XXXX", ATTRS{serial}=="XXXXXXXX", SYMLINK+="imu", MODE="0660", GROUP="dialout"
+# XIAO ESP32-S3 (IMU bridge). Read from the board 2026-08-06 with udevadm,
+# not guessed. 303a:1001 is Espressif's generic USB JTAG/serial device and is
+# shared by many ESP32-S3 boards, so the serial number (which is the MAC) is
+# what makes this unique.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", ATTRS{serial}=="D8:3B:DA:45:4D:B4", SYMLINK+="imu", MODE="0660", GROUP="dialout"
+
+# These symlinks are a convenience, not a dependency. Both the bridge and the
+# NTRIP client resolve their port through /dev/serial/by-id/ when the symlink
+# is absent, so the rig works correctly with or without this file installed.
+# Verify after installing:
+#     ls -l /dev/imu /dev/gnss

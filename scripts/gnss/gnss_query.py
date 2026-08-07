@@ -12,7 +12,11 @@ import sys
 import time
 import serial
 
-PORT = sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyACM0"
+import glob, os
+# Resolve by USB identity: /dev/ttyACM0 is contested with the XIAO.
+_by_id = [q for q in glob.glob("/dev/serial/by-id/*") if "1a86_USB_Single_Serial" in q]
+_default = os.path.realpath(_by_id[0]) if len(_by_id) == 1 else "/dev/ttyACM0"
+PORT = sys.argv[1] if len(sys.argv) > 1 else _default
 BAUD = int(sys.argv[2]) if len(sys.argv) > 2 else 460800
 
 QUERIES = [
