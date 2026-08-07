@@ -13,8 +13,16 @@ terminal.
 
 ## 1. Record a bag
 
-Plug the XIAO in **before** launching — the bridge node hardcodes
-`/dev/ttyACM0` and will not find it later.
+Plug the XIAO in **before** launching — the bridge opens its port once at
+startup and does not rescan.
+
+It no longer hardcodes `/dev/ttyACM0`. Since 2026-08-06 it resolves the XIAO
+by USB identity through `/dev/serial/by-id/`, because the LG290P GNSS
+enumerates as a CH343 and competes for the same `ttyACM` numbers — with both
+plugged in the GNSS took `ttyACM0` and the XIAO took `ttyACM1`. The old
+hardcoded path pointed at the wrong device and failed **silently**: NMEA
+contains no `0xAA` sync byte, so the bridge published nothing and looked
+merely idle.
 
 ```bash
 ros2 launch ~/pandar-40p/launch/rig.launch.py record:=true
