@@ -213,10 +213,33 @@ L1 C/A / L2C / L5-Q, GLONASS 1/3 = G1/G2, Galileo 7/2 = E1/E5b, BeiDou
 have no corrections, so they do not help RTK — which is why the overall
 median flatters the situation.
 
-**Untested idea if float persists:** a ground plane under the antenna, a
-metal disc 10–15 cm across. It suppresses reflections from below and lifts
-the second frequency disproportionately. This is reasoning from how patch
-antennas behave, not something measured on this rig.
+**Ground plane — size it for L2, not L1.** A ground plane suppresses
+reflections arriving from below, and its effectiveness scales with
+wavelength. The second frequencies are the *longer* wavelengths, which is
+awkward because they are also the ones RTK is short of here:
+
+| signal | frequency | wavelength |
+|---|---|---|
+| GPS L1 / BDS B1I | 1575 / 1561 MHz | 19.0 / 19.2 cm |
+| **GPS L2** | **1227.60 MHz** | **24.4 cm** |
+| **GLONASS G2** | **~1246 MHz** | **24.1 cm** |
+
+Rule of thumb: diameter ≥ 1 wavelength is good, ≥ λ/2 is the minimum worth
+bothering with. So **25–30 cm or larger**, not the 10–15 cm figure an earlier
+version of this file gave — that is sized for L1, the band already fine, and
+would do comparatively little for L2. A pizza pan, cake tin lid or baking
+sheet is the right order of size.
+
+Requirements: continuous conductor (foil over cardboard is fine if unbroken),
+antenna centred and sitting directly on it, flat and horizontal. A magnetic
+mount antenna is a hint the design expects a car roof — i.e. a very large
+ground plane — which would explain weak L2 when it sits on nothing.
+
+**Still reasoning from antenna behaviour, not measured on this rig.**
+Baseline before the experiment, 45 s averaged, correction-carrying bands
+only: GPS L1 42 / L2C 36, GLONASS G1 39 / G2 35, Galileo E1 38 / E5b 41,
+BeiDou B1I 34. Compare against these with
+`gnss_monitor.py --interval 45 --once`.
 
 **Corrections age (GGA field 13) is the fastest diagnostic.** Empty means no
 RTCM is arriving at all; ~1 s means the link is healthy. After the client
