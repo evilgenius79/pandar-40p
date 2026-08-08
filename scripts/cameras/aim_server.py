@@ -37,23 +37,29 @@ import cv2
 # RIGHT. The outermost pair, which maximises combined coverage under splay.
 # This choice drives the software crop everywhere downstream; change it here
 # and in CLAUDE.md together or aiming and mapping will disagree.
-CAMS = [("/dev/video2", "camera A (video2)", "L"),
-        ("/dev/video4", "camera B (video4)", "R")]
+# Physical arrangement confirmed by Matt 2026-08-07: board A (video2) is
+# mounted on the LEFT side of the mast, board B (video4) on the RIGHT.
+# If a wave test ever shows these panels swapped, the USB mapping moved --
+# fix it HERE, not by re-mounting.
+CAMS = [("/dev/video2", "A  keeper L  (left mount)", "L"),
+        ("/dev/video4", "B  keeper R  (right mount)", "R")]
 
 PAGE = """<!doctype html><html><head>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <title>rig cameras</title>
 <style>
  body{margin:0;background:#111;color:#ddd;font:14px system-ui}
- h2{margin:8px;font-weight:600}
- img{width:100%;display:block}
+ .row{display:flex}
+ .row img{width:50%;display:block}
  .note{margin:8px;color:#888}
 </style></head><body>
-<h2>camera A (video2)</h2><img src="/cam0.mjpg">
-<h2>camera B (video4)</h2><img src="/cam1.mjpg">
-<p class=note>Each image is the side-by-side dual-lens frame; only one
-half per board will be used. Crosshair marks each lens centre; grid is
-thirds. Splay target &plusmn;30&ndash;35&deg;, up-pitch 10&ndash;15&deg;.</p>
+<div class=row><img src="/cam0.mjpg"><img src="/cam1.mjpg"></div>
+<p class=note>Keeper lenses only, arranged as mounted: A (points left) on
+the left, B (points right) on the right. Green crosshair = optical axis,
+goes on the side mark. Amber line = where the CENTRE mark should appear in
+each image (~1/3 from the inner edge). When both crosshairs are on their
+side marks AND the centre mark sits near both amber lines, splay and
+overlap are correct. Up-pitch: horizon on the lower gridline.</p>
 </body></html>"""
 
 
@@ -82,6 +88,11 @@ class Grabber(threading.Thread):
                 time.sleep(0.5)
                 continue
             self.ok = True
+            # keeper half only -- the discard half is dead weight for aiming
+            h, w = frame.shape[:2]
+            half = w // 2
+            frame = frame[:, :half] if self.keeper == "L" else frame[:, half:]
+            frame = frame.copy()
             self.annotate(frame)
             ok, buf = cv2.imencode(".jpg", frame,
                                    [cv2.IMWRITE_JPEG_QUALITY, 70])
@@ -90,36 +101,41 @@ class Grabber(threading.Thread):
                     self.jpeg = buf.tobytes()
 
     def annotate(self, f):
+        """Overlay for a single keeper half.
+
+        The amber vertical line marks where the CENTRE mark should land:
+        one third in from the INNER edge -- the edge facing the other
+        camera. Camera A points left of forward, so forward appears near
+        its RIGHT edge; camera B mirrors that. Crosshair on the side mark
+        + centre mark on the amber line = splay correct by construction.
+        """
         h, w = f.shape[:2]
-        half = w // 2
-        white, grey = (255, 255, 255), (110, 110, 110)
-        green = (80, 220, 80)
-        # separator between the two lenses of this board
-        cv2.line(f, (half, 0), (half, h), (0, 200, 255), 2)
-        for i, x0 in enumerate((0, half)):
-            name = ("L", "R")[i]
-            keep = (name == self.keeper)
-            cx, cy = x0 + half // 2, h // 2
-            col = green if keep else grey
-            # thirds grid only on the keeper; the discard just gets dimmed
-            if keep:
-                for gx in (x0 + half // 3, x0 + 2 * half // 3):
-                    cv2.line(f, (gx, 0), (gx, h), grey, 1)
-                for gy in (h // 3, 2 * h // 3):
-                    cv2.line(f, (x0, gy), (x0 + half, gy), grey, 1)
-                cv2.line(f, (cx - 40, cy), (cx + 40, cy), col, 3)
-                cv2.line(f, (cx, cy - 40), (cx, cy + 40), col, 3)
-                cv2.circle(f, (cx, cy), 24, col, 3)
-                cv2.putText(f, f"{name}  KEEPER", (x0 + 12, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.1, green, 3)
-            else:
-                # big X so there is no ambiguity about which half is unused
-                cv2.line(f, (x0 + 20, 20), (x0 + half - 20, h - 20), grey, 2)
-                cv2.line(f, (x0 + half - 20, 20), (x0 + 20, h - 20), grey, 2)
-                cv2.putText(f, f"{name}  unused", (x0 + 12, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.1, grey, 2)
-        cv2.putText(f, self.label, (12, h - 14),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
+        grey, green, amber = (110, 110, 110), (80, 220, 80), (0, 190, 255)
+        cx, cy = w // 2, h // 2
+        for gx in (w // 3, 2 * w // 3):
+            cv2.line(f, (gx, 0), (gx, h), grey, 1)
+        for gy in (h // 3, 2 * h // 3):
+            cv2.line(f, (0, gy), (w, gy), grey, 1)
+        # Centre-mark line: 18% of the width in from the INNER edge (right
+        # edge for the left-mounted A, left edge for B). Derivation: the
+        # centre mark sits `splay` degrees from each optical axis, so its
+        # image position is 0.5 - splay/HFOV from the inner edge; for 33
+        # degrees of splay and a ~95-110 degree lens that is 0.15-0.20.
+        # An earlier version drew this at 1/3, which is the far EDGE of the
+        # overlap zone, not the centre-mark position -- aiming to that line
+        # produced half the intended splay. The green-crosshair-on-side-mark
+        # method is exact regardless of FOV; this line is the cross-check.
+        off = int(w * 0.18)
+        fwd_x = w - off if self.keeper == "L" else off
+        cv2.line(f, (fwd_x, 0), (fwd_x, h), amber, 2)
+        cv2.putText(f, "centre mark", (fwd_x - 150 if self.keeper == "L"
+                    else fwd_x + 8, h // 2 - 12),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, amber, 2)
+        cv2.line(f, (cx - 40, cy), (cx + 40, cy), green, 3)
+        cv2.line(f, (cx, cy - 40), (cx, cy + 40), green, 3)
+        cv2.circle(f, (cx, cy), 24, green, 3)
+        cv2.putText(f, self.label, (12, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, green, 2)
 
 
 GRABBERS = []
