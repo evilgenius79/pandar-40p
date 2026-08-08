@@ -33,8 +33,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cv2
 
-CAMS = [("/dev/video2", "camera A (video2)"),
-        ("/dev/video4", "camera B (video4)")]
+# Keeper lens per board -- MATT'S CALL 2026-08-07: A keeps LEFT, B keeps
+# RIGHT. The outermost pair, which maximises combined coverage under splay.
+# This choice drives the software crop everywhere downstream; change it here
+# and in CLAUDE.md together or aiming and mapping will disagree.
+CAMS = [("/dev/video2", "camera A (video2)", "L"),
+        ("/dev/video4", "camera B (video4)", "R")]
 
 PAGE = """<!doctype html><html><head>
 <meta name=viewport content="width=device-width, initial-scale=1">
@@ -56,9 +60,9 @@ thirds. Splay target &plusmn;30&ndash;35&deg;, up-pitch 10&ndash;15&deg;.</p>
 class Grabber(threading.Thread):
     """Continuously captures one camera; keeps only the newest JPEG."""
 
-    def __init__(self, dev, label, w, h, fps):
+    def __init__(self, dev, label, keeper, w, h, fps):
         super().__init__(daemon=True)
-        self.dev, self.label = dev, label
+        self.dev, self.label, self.keeper = dev, label, keeper
         self.w, self.h, self.fps = w, h, fps
         self.jpeg = None
         self.lock = threading.Lock()
@@ -89,20 +93,31 @@ class Grabber(threading.Thread):
         h, w = f.shape[:2]
         half = w // 2
         white, grey = (255, 255, 255), (110, 110, 110)
+        green = (80, 220, 80)
         # separator between the two lenses of this board
         cv2.line(f, (half, 0), (half, h), (0, 200, 255), 2)
         for i, x0 in enumerate((0, half)):
+            name = ("L", "R")[i]
+            keep = (name == self.keeper)
             cx, cy = x0 + half // 2, h // 2
-            # thirds grid, then a crosshair at the lens centre
-            for gx in (x0 + half // 3, x0 + 2 * half // 3):
-                cv2.line(f, (gx, 0), (gx, h), grey, 1)
-            for gy in (h // 3, 2 * h // 3):
-                cv2.line(f, (x0, gy), (x0 + half, gy), grey, 1)
-            cv2.line(f, (cx - 40, cy), (cx + 40, cy), white, 2)
-            cv2.line(f, (cx, cy - 40), (cx, cy + 40), white, 2)
-            cv2.circle(f, (cx, cy), 24, white, 2)
-            cv2.putText(f, ("L", "R")[i], (x0 + 12, 34),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.1, white, 2)
+            col = green if keep else grey
+            # thirds grid only on the keeper; the discard just gets dimmed
+            if keep:
+                for gx in (x0 + half // 3, x0 + 2 * half // 3):
+                    cv2.line(f, (gx, 0), (gx, h), grey, 1)
+                for gy in (h // 3, 2 * h // 3):
+                    cv2.line(f, (x0, gy), (x0 + half, gy), grey, 1)
+                cv2.line(f, (cx - 40, cy), (cx + 40, cy), col, 3)
+                cv2.line(f, (cx, cy - 40), (cx, cy + 40), col, 3)
+                cv2.circle(f, (cx, cy), 24, col, 3)
+                cv2.putText(f, f"{name}  KEEPER", (x0 + 12, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.1, green, 3)
+            else:
+                # big X so there is no ambiguity about which half is unused
+                cv2.line(f, (x0 + 20, 20), (x0 + half - 20, h - 20), grey, 2)
+                cv2.line(f, (x0 + half - 20, 20), (x0 + 20, h - 20), grey, 2)
+                cv2.putText(f, f"{name}  unused", (x0 + 12, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.1, grey, 2)
         cv2.putText(f, self.label, (12, h - 14),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
 
@@ -157,8 +172,8 @@ def main():
     a = ap.parse_args()
 
     w, h, fps = (3200, 1200, 15) if a.full_res else (2560, 720, 30)
-    for dev, label in CAMS:
-        g = Grabber(dev, label, w, h, fps)
+    for dev, label, keeper in CAMS:
+        g = Grabber(dev, label, keeper, w, h, fps)
         g.start()
         GRABBERS.append(g)
 
